@@ -1,4 +1,11 @@
-# 資料助秘專案彙整
+# 資料助秘專案彙整 https://achir1015.github.io/zms-projects/app/
+<img width="1440" height="900" alt="image" src="https://github.com/user-attachments/assets/cdf7937d-5143-4cc6-ad49-6545ce8499e0" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/c38648f0-282a-4691-b608-586947b2ee50" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/bee20b44-ea8b-4a8c-82a2-56026c164101" />
+說明
+
+https://github.com/user-attachments/assets/e6c93ffa-3455-43ab-93ed-f8085f004e47
+
 
 把 GitHub 上的所有專案集中管理：專案主題（README 大標題）、說明、最新發佈版本與下載檔、App Store／Play／影片／線上版連結、
 自訂分類頁簽、六個平台（Windows、Mac、線上版、iPhone、iPad、Android）的開發進度與待辦事項。
