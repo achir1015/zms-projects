@@ -1,0 +1,130 @@
+"""資料表定義（唯一來源）：建表 SQL 與欄位中文說明。
+
+表名前綴：sys_＝系統（使用者、權限、設定、紀錄）、prj_＝專案資料。
+tools/gen_schema_doc.py 會依這裡產生 docs/資料表欄位明細.md。
+"""
+
+# (表名, 中文名稱, [(欄位, SQL 型別與屬性, 中文說明)], 其他限制)
+TABLES = [
+    ("sys_meta", "系統參數", [
+        ("k", "VARCHAR(40) NOT NULL PRIMARY KEY", "參數代號"),
+        ("v", "TEXT", "參數值")], []),
+    ("sys_company", "公司與 GitHub 設定", [
+        ("id", "INT NOT NULL PRIMARY KEY", "固定 1"),
+        ("name", "VARCHAR(120) NOT NULL DEFAULT ''", "公司或團隊名稱"),
+        ("github_owner", "VARCHAR(60) NOT NULL DEFAULT 'achir1015'", "GitHub 帳號名稱（不是 email）"),
+        ("github_token", "VARCHAR(255) NOT NULL DEFAULT ''", "GitHub Token（選填，只有系統管理權限看得到）"),
+        ("include_forks", "TINYINT NOT NULL DEFAULT 1", "顯示 Fork 來的專案"),
+        ("auto_sync", "TINYINT NOT NULL DEFAULT 0", "開程式時自動彙整"),
+        ("last_sync_at", "DATETIME NULL", "上次彙整時間"),
+        ("last_sync_note", "VARCHAR(255) NOT NULL DEFAULT ''", "上次彙整結果")], []),
+    ("sys_user", "使用者", [
+        ("uid", "VARCHAR(30) NOT NULL PRIMARY KEY", "帳號"),
+        ("name", "VARCHAR(60) NOT NULL", "姓名"),
+        ("pw_hash", "VARCHAR(200) NOT NULL", "密碼雜湊（PBKDF2）"),
+        ("role", "VARCHAR(30) NOT NULL DEFAULT ''", "角色範本"),
+        ("dept", "VARCHAR(30) NOT NULL DEFAULT ''", "部門"),
+        ("is_admin", "TINYINT NOT NULL DEFAULT 0", "系統管理員"),
+        ("active", "TINYINT NOT NULL DEFAULT 1", "啟用"),
+        ("last_login", "DATETIME NULL", "最近登入"),
+        ("created_at", "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP", "建立時間")], []),
+    ("sys_user_perm", "使用者權限", [
+        ("uid", "VARCHAR(30) NOT NULL", "帳號"),
+        ("func", "VARCHAR(10) NOT NULL", "功能代號"),
+        ("lvl", "TINYINT NOT NULL DEFAULT 0", "等級 0 無、1 查詢、2 維護")], ["PRIMARY KEY (uid, func)"]),
+    ("sys_audit_log", "操作紀錄", [
+        ("id", "BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY", "流水號"),
+        ("at", "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP", "時間"),
+        ("uid", "VARCHAR(30) NOT NULL DEFAULT ''", "使用者"),
+        ("action", "VARCHAR(30) NOT NULL", "動作"),
+        ("target", "VARCHAR(80) NOT NULL DEFAULT ''", "對象"),
+        ("detail", "TEXT", "內容（異動前 → 後）")], ["KEY ix_at (at)"]),
+    ("sys_http_cache", "GitHub 查詢快取（ETag，沒變動時不扣查詢次數）", [
+        ("url", "VARCHAR(400) NOT NULL PRIMARY KEY", "查詢網址"),
+        ("etag", "VARCHAR(200) NOT NULL DEFAULT ''", "ETag"),
+        ("data", "MEDIUMTEXT", "上次回應（JSON）"),
+        ("at", "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP", "時間")], []),
+    ("prj_project", "專案（由 GitHub 彙整或手動新增）", [
+        ("name", "VARCHAR(100) NOT NULL PRIMARY KEY", "專案名稱（儲存庫名稱）"),
+        ("full_name", "VARCHAR(160) NOT NULL DEFAULT ''", "完整名稱 owner/repo"),
+        ("url", "VARCHAR(255) NOT NULL DEFAULT ''", "專案網址"),
+        ("title", "VARCHAR(120) NOT NULL DEFAULT ''", "中文名稱（手動填寫，空白時由說明自動取）"),
+        ("description", "TEXT", "說明"),
+        ("stars", "INT NOT NULL DEFAULT 0", "星星數"),
+        ("forks", "INT NOT NULL DEFAULT 0", "Fork 數"),
+        ("language", "VARCHAR(40) NOT NULL DEFAULT ''", "主要語言"),
+        ("topics", "TEXT", "主題標籤（以逗號分隔）"),
+        ("homepage", "VARCHAR(255) NOT NULL DEFAULT ''", "首頁／線上版網址"),
+        ("default_branch", "VARCHAR(60) NOT NULL DEFAULT 'main'", "預設分支"),
+        ("pushed_at", "DATETIME NULL", "最後更新"),
+        ("is_fork", "TINYINT NOT NULL DEFAULT 0", "Fork 來的"),
+        ("is_private", "TINYINT NOT NULL DEFAULT 0", "私人專案"),
+        ("archived", "TINYINT NOT NULL DEFAULT 0", "已封存"),
+        ("readme", "MEDIUMTEXT", "README 原文"),
+        ("rel_tag", "VARCHAR(60) NOT NULL DEFAULT ''", "最新發佈版本"),
+        ("rel_name", "VARCHAR(160) NOT NULL DEFAULT ''", "發佈名稱"),
+        ("rel_url", "VARCHAR(255) NOT NULL DEFAULT ''", "發佈頁網址"),
+        ("rel_published", "DATETIME NULL", "發佈時間"),
+        ("rel_assets", "MEDIUMTEXT", "下載檔案清單（JSON：name、url、size、downloads）"),
+        ("rel_checked", "TINYINT NOT NULL DEFAULT 0", "已查過發佈版本"),
+        ("source", "VARCHAR(10) NOT NULL DEFAULT 'github'", "來源 github／manual"),
+        ("gone", "TINYINT NOT NULL DEFAULT 0", "GitHub 上已找不到（刪除或改名）"),
+        ("synced_at", "DATETIME NULL", "彙整時間")], ["KEY ix_pushed (pushed_at)"]),
+    ("prj_note", "專案便利貼（手動補充，彙整時不會被覆蓋）", [
+        ("name", "VARCHAR(100) NOT NULL PRIMARY KEY", "專案名稱"),
+        ("status", "VARCHAR(10) NOT NULL DEFAULT ''", "專案狀態 PLAN 規劃中、DEV 開發中、LIVE 已上線、HOLD 暫停、END 結束"),
+        ("owner_uid", "VARCHAR(30) NOT NULL DEFAULT ''", "負責人帳號"),
+        ("apple_url", "VARCHAR(255) NOT NULL DEFAULT ''", "App Store／TestFlight 網址"),
+        ("apple_note", "VARCHAR(255) NOT NULL DEFAULT ''", "Apple 審核狀態備註"),
+        ("play_url", "VARCHAR(255) NOT NULL DEFAULT ''", "Google Play 網址"),
+        ("play_note", "VARCHAR(255) NOT NULL DEFAULT ''", "Play 商店備註"),
+        ("video_url", "VARCHAR(255) NOT NULL DEFAULT ''", "示範影片網址"),
+        ("download_url", "VARCHAR(255) NOT NULL DEFAULT ''", "下載網址（優先於自動偵測）"),
+        ("live_url", "VARCHAR(255) NOT NULL DEFAULT ''", "線上版網址（優先於 GitHub 首頁）"),
+        ("memo", "TEXT", "備忘"),
+        ("updated_at", "DATETIME NULL", "修改時間"),
+        ("updated_by", "VARCHAR(30) NOT NULL DEFAULT ''", "修改人")], []),
+    ("prj_platform", "平台進度（Windows、Mac、線上版、iPhone、iPad、Android）", [
+        ("name", "VARCHAR(100) NOT NULL", "專案名稱"),
+        ("platform", "VARCHAR(8) NOT NULL", "平台 WIN MAC WEB IOS IPAD AND"),
+        ("status", "TINYINT NOT NULL DEFAULT 0", "0 未定、1 規劃中、2 開發中、3 測試中、4 已發佈、9 不適用"),
+        ("version", "VARCHAR(30) NOT NULL DEFAULT ''", "版本"),
+        ("note", "VARCHAR(255) NOT NULL DEFAULT ''", "備註"),
+        ("updated_at", "DATETIME NULL", "修改時間")], ["PRIMARY KEY (name, platform)"]),
+    ("prj_category", "分類（頁簽）", [
+        ("id", "INT NOT NULL AUTO_INCREMENT PRIMARY KEY", "流水號"),
+        ("name", "VARCHAR(40) NOT NULL", "分類名稱"),
+        ("color", "VARCHAR(9) NOT NULL DEFAULT '#2563EB'", "顏色"),
+        ("sort", "INT NOT NULL DEFAULT 0", "頁簽順序"),
+        ("rule", "VARCHAR(160) NOT NULL DEFAULT ''", "自動分類規則（專案名稱或說明含有的字，以逗號分隔）")],
+     ["UNIQUE KEY uq_name (name)"]),
+    ("prj_assign", "專案與分類的對應", [
+        ("name", "VARCHAR(100) NOT NULL", "專案名稱"),
+        ("cat_id", "INT NOT NULL", "分類")], ["PRIMARY KEY (name, cat_id)", "KEY ix_cat (cat_id)"]),
+    ("prj_task", "待辦事項", [
+        ("id", "INT NOT NULL AUTO_INCREMENT PRIMARY KEY", "流水號"),
+        ("name", "VARCHAR(100) NOT NULL DEFAULT ''", "專案名稱（空白＝不屬於特定專案）"),
+        ("title", "VARCHAR(255) NOT NULL", "事項"),
+        ("platform", "VARCHAR(8) NOT NULL DEFAULT ''", "相關平台"),
+        ("priority", "TINYINT NOT NULL DEFAULT 2", "優先 1 高、2 中、3 低"),
+        ("due", "DATE NULL", "預定完成日"),
+        ("uid", "VARCHAR(30) NOT NULL DEFAULT ''", "負責人"),
+        ("done", "TINYINT NOT NULL DEFAULT 0", "已完成"),
+        ("done_at", "DATETIME NULL", "完成時間"),
+        ("created_by", "VARCHAR(30) NOT NULL DEFAULT ''", "建立人"),
+        ("created_at", "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP", "建立時間")], ["KEY ix_name (name)"]),
+]
+
+
+def ddl():
+    out = []
+    for name, title, cols, extra in TABLES:
+        body = ["  `%s` %s COMMENT '%s'" % (c, t, d.replace("'", "''")) for c, t, d in cols]
+        body += ["  " + x for x in extra]
+        out.append("CREATE TABLE IF NOT EXISTS `%s` (\n%s\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 "
+                   "COLLATE=utf8mb4_unicode_ci COMMENT='%s'" % (name, ",\n".join(body), title))
+    return out
+
+
+def columns(table):
+    return [c[0] for t in TABLES if t[0] == table for c in t[2]]
