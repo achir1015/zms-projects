@@ -21,7 +21,7 @@
 
 ## 平台
 
-Windows 11（v1.0.0）→ macOS → 線上版 → iPhone／iPad（線上安裝）→ Android，依序推出。
+Windows 11、macOS（v1.0.0，已公證）→ 線上版 → iPhone／iPad（線上安裝）→ Android，依序推出。
 
 ## 開發
 
