@@ -88,6 +88,12 @@ class App:
         p.bgcolor = T.BG
         p.padding = 0
         p.spacing = 0
+        from . import mobile
+        # 手機／平板 App（開發預覽用 ZP_MOBILE；線上版開在手機瀏覽器不算，那是網頁版）
+        if os.environ.get("ZP_MOBILE") or (not p.web and mobile.is_mobile(p)):
+            self.mobile = True
+            mobile.start(self)
+            return
         try:
             p.window.width, p.window.height = 1440, 900
             p.window.min_width, p.window.min_height = 1180, 700
@@ -252,7 +258,15 @@ class App:
 
     def main(self):
         p = self.page
-        hide = {"backup", "update"} if self.ctx.web else set()      # 線上版：備份還原、更新只在這台電腦操作
+        hide = {"backup", "update"} if self.ctx.web else set()      # 線上版、手機：備份還原、更新只在電腦上操作
+        if self.mobile and T.MOBILE:          # iPhone 直向：工具列＋抽屜選單
+            from . import mobile
+            self.groups = [(g, ic, tone, [it for it in items if self.allowed(it[3], it[4]) and it[0] not in hide])
+                           for g, ic, tone, items in menu()]
+            self.groups = [g for g in self.groups if g[3]]
+            self.expanded = {g[0] for g in self.groups}
+            mobile.main(self)
+            return
         self.groups = [(g, ic, tone, [it for it in items if self.allowed(it[3], it[4]) and it[0] not in hide])
                        for g, ic, tone, items in menu()]
         self.groups = [g for g in self.groups if g[3]]
@@ -277,7 +291,9 @@ class App:
                 spacing=0, expand=True),
                 ft.PopupMenuButton(icon=ft.Icons.MORE_VERT, icon_color="#C9D6EA", items=[
                     ft.PopupMenuItem("變更密碼", icon=ft.Icons.KEY, on_click=lambda e: self.change_password()),
-                    ft.PopupMenuItem("登出", icon=ft.Icons.LOGOUT, on_click=lambda e: self.logout())])],
+                    ft.PopupMenuItem("登出", icon=ft.Icons.LOGOUT, on_click=lambda e: self.logout())] +
+                    ([ft.PopupMenuItem("更換電腦", icon=ft.Icons.LINK, on_click=lambda e: self._switch_server())]
+                     if self.mobile else []))],
                 spacing=10), padding=14)], spacing=0),
             width=248, gradient=ft.LinearGradient(begin=ft.Alignment.TOP_CENTER, end=ft.Alignment.BOTTOM_CENTER,
                                                  colors=[T.SIDEBAR_TOP, T.SIDEBAR_BOTTOM]))
@@ -298,6 +314,10 @@ class App:
         layout = ft.Row([side, ft.Column([top, self.body], expand=True, spacing=0)], expand=True, spacing=0)
         p.add(ft.SafeArea(layout, expand=True) if self.mobile else layout)
         self.go("home")
+        if self.mobile:                       # iPad：資料在電腦上，更新改開安裝頁
+            from . import mobile
+            p.run_thread(mobile.check_update, self)
+            return
         if self.ctx.web:
             return
         threading.Thread(target=self._check_update, daemon=True).start()
@@ -305,6 +325,33 @@ class App:
             threading.Thread(target=self._auto_sync, daemon=True).start()
         if self.st.extra.get("web_enabled") and not self.web:
             threading.Thread(target=self._start_web_quiet, daemon=True).start()
+        if self.st.extra.get("api_enabled") and not self.api:
+            threading.Thread(target=self._start_api_quiet, daemon=True).start()
+
+    # ================================================================ 手機 App 連線服務
+    def start_api(self):
+        from .. import api
+        if self.api and self.api.running:
+            return self.api
+        self.api = api.ApiServer(self.db, int(self.st.extra.get("api_port") or api.DEFAULT_PORT))
+        try:
+            self.api.start()
+        except Exception:
+            self.api = None
+            raise
+        return self.api
+
+    def _start_api_quiet(self):
+        try:
+            self.start_api()
+        except Exception as e:
+            log.exception("api start")
+            self.ctx.toast("手機 App 連線服務無法啟動：%s" % e, True)
+
+    def stop_api(self):
+        if self.api:
+            self.api.stop()
+            self.api = None
 
     # ================================================================ 公司內的線上版（網頁服務）
     def start_web(self):
@@ -400,6 +447,21 @@ class App:
         self.ctx.stop_voice()
         self.current = sid
         self.expanded.add(g)
+        phone = self.mobile and T.MOBILE
+        if phone:
+            from . import mobile
+            self.title.value = it[1]
+            self.render_sidebar()
+            self.page.run_task(mobile.close_drawer, self.page)
+            try:
+                content = build_screen(sid, self.ctx, **kw)
+                T.mobilize(content)
+                self.body.content = ft.Column([content], scroll=ft.ScrollMode.AUTO, expand=True)
+            except Exception as e:
+                log.exception("screen %s", sid)
+                self.body.content = T.empty_state(ft.Icons.ERROR_OUTLINE, "畫面載入失敗", str(e))
+            self.page.update()
+            return
         self.crumb.controls = [T.icon_tile(it[2], tone, 32, radius=9), T.muted(g, 14),
                                ft.Icon(ft.Icons.CHEVRON_RIGHT, size=16, color=T.MUTED),
                                ft.Text(it[1], size=15, weight=ft.FontWeight.W_700, color=T.TEXT)]
@@ -460,8 +522,17 @@ class App:
                  [T.btn("取消", kind="ghost", on_click=lambda e: c.close()), T.btn("儲存", ft.Icons.SAVE, save)],
                  icon=ft.Icons.KEY, width=380)
 
+    def _switch_server(self):
+        from . import mobile
+        mobile.switch_server(self)
+
     def logout(self):
         self.ctx.stop_voice()
+        if self.mobile:
+            from . import mobile
+            self.books.logout()
+            mobile.login(self)
+            return
         self.books.logout()
         self.current = "home"
         self.login()
@@ -529,6 +600,7 @@ class App:
     def shutdown(self):
         speaker.stop()
         self.stop_web()
+        self.stop_api()
         try:
             if self.books and self.books.user:
                 self.books.logout()

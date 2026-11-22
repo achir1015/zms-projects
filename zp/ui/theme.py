@@ -412,7 +412,8 @@ class Ctx:
         self.books = app.books
         self.reports = app.reports
         # 線上版（瀏覽器）：檔案改上傳／下載、語音在瀏覽器播放（各分頁各自一個播放器）
-        self.web = bool(getattr(app.page, "web", False)) or MOBILE
+        self.mobile = bool(getattr(app, "mobile", False))   # 手機／平板 App：資料在電腦上，檔案和線上版一樣上傳／下載
+        self.web = bool(getattr(app.page, "web", False)) or MOBILE or self.mobile
         self._audio = None
 
     # ---------------------------------------------------------- 語音

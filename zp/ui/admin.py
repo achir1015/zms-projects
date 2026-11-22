@@ -214,6 +214,7 @@ class Update(ft.Column):
                           kind="accent")],
                     spacing=10), width=340, padding=22)], spacing=14, vertical_alignment=ft.CrossAxisAlignment.START, data="split"),
             self.web_card(),
+            self.api_card(),
             T.card(ft.Column([ft.Text("系統資訊", size=15, weight=ft.FontWeight.W_700),
                               T.muted("系統開發：吳玉柱 先生 與 Claude AI Opus 5.5", 13),
                               T.muted("資料庫：MariaDB　介面：Flet　語音：微軟神經語音／Windows 內建語音", 13)],
@@ -365,6 +366,83 @@ class Update(ft.Column):
         self.render_web()
         self.update()
 
+    # ---------------------------------------------------------------- 手機 App 連線
+    def api_card(self):
+        from .. import api
+        ex = self.ctx.app.st.extra
+        can = self.ctx.books.can("SYS", 2)
+        self.api_switch = T.switch("開啟手機 App 連線（iPhone／iPad App 經同一個 Wi-Fi 連到這台電腦）",
+                                   bool(ex.get("api_enabled")), on_change=self.toggle_api, disabled=not can)
+        self.api_port = T.field("埠", str(ex.get("api_port") or api.DEFAULT_PORT), width=110,
+                                keyboard_type=ft.KeyboardType.NUMBER, disabled=not can)
+        self.api_box = ft.Column(spacing=10)
+        self.render_api()
+        return T.card(ft.Column([
+            ft.Row([T.icon_tile(ft.Icons.PHONE_IPHONE, "violet", 44), ft.Column([
+                ft.Text("手機 App 連線", size=17, weight=ft.FontWeight.W_700),
+                T.muted("iPhone／iPad App 的資料都在這台電腦，App 透過這個服務讀寫" +
+                        ("" if can else "（需要系統管理權限才能開關）"), 12)], spacing=2, expand=True)], spacing=12),
+            ft.Row([self.api_switch, self.api_port], spacing=16, wrap=True), self.api_box], spacing=12), padding=22)
+
+    def render_api(self):
+        from .. import api
+        srv = self.ctx.app.api
+        if srv and srv.running:
+            from urllib.parse import quote
+
+            from ..webserve import qr_png
+            rows = []
+            for u in srv.urls() or ["http://127.0.0.1:%d" % srv.port]:
+                try:
+                    qr = ft.Image(src=qr_png(api.DEEP_LINK % quote(u, safe="")), width=132, height=132)
+                except Exception:
+                    qr = ft.Container()
+                rows.append(ft.Row([qr, ft.Column([
+                    ft.Text(u, size=18, weight=ft.FontWeight.W_700, color=T.PRIMARY, selectable=True),
+                    T.muted("用 iPhone／iPad 相機掃描 QR Code，會自動開啟 App 並連到這台電腦", 12)], spacing=6)],
+                    spacing=16))
+            self.api_box.controls = [T.chip("服務執行中", "green", ft.Icons.PHONE_IPHONE)] + rows + [
+                T.muted("App 安裝：iPhone／iPad 用 Safari 開 https://achir1015.github.io/zms-projects/ios/ 。"
+                        "登入用本系統的帳號；關閉這個程式時連線服務也會停止。", 12),
+                T.muted("第一次開啟時，若 Windows 防火牆／macOS 詢問是否允許連入，請按允許（私人網路）。"
+                        "iPhone 第一次連線要允許 App 使用「區域網路」。", 12)]
+        else:
+            self.api_box.controls = [T.muted("未開啟。打開開關後，iPhone／iPad App 就能連到這台電腦使用專案彙整。", 13)]
+
+    def toggle_api(self, e):
+        app = self.ctx.app
+        ex = app.st.extra
+        on = bool(self.api_switch.value)
+        if on:
+            try:
+                port = int(self.api_port.value or 0)
+                assert 1024 <= port <= 65535
+            except Exception:
+                self.api_switch.value = False
+                self.ctx.toast("埠請填 1024～65535 的數字", True)
+                self.update()
+                return
+            ex["api_port"] = port
+            app.stop_api()
+            try:
+                app.start_api()
+            except Exception as ex2:
+                self.api_switch.value = False
+                ex["api_enabled"] = False
+                app.st.save()
+                self.render_api()
+                self.ctx.toast("手機 App 連線服務無法啟動：%s" % ex2, True)
+                self.update()
+                return
+            self.ctx.books.log("api", "on :%d" % port)
+        else:
+            app.stop_api()
+            self.ctx.books.log("api", "off")
+        ex["api_enabled"] = on
+        app.st.save()
+        self.render_api()
+        self.update()
+
     def shortcut(self):
         self.ctx.guard(maintenance.create_desktop_shortcut, ok="桌面替身已建立" if MAC else "桌面捷徑已建立")
 
@@ -376,7 +454,7 @@ ACTIONS = {"login": "登入", "logout": "登出", "login_fail": "登入失敗", 
            "cat_save": "修改分類", "cat_delete": "刪除分類", "auto_classify": "自動分類", "task_save": "儲存待辦",
            "task_done": "完成待辦", "task_undo": "取消完成", "task_delete": "刪除待辦", "import_html": "匯入網頁",
            "import_backup": "匯入備份", "export_backup": "匯出備份",
-           "web": "線上版服務", "publish": "發佈線上版"}
+           "web": "線上版服務", "publish": "發佈線上版", "api": "手機連線服務", "mobile_login": "手機登入"}
 
 
 class Audit(ft.Column):

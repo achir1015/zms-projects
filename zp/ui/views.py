@@ -76,9 +76,38 @@ class Matrix(ft.Column):
                            T.muted(p["name"], 11)], spacing=0, width=300)] + cells, spacing=8),
                 padding=ft.Padding.symmetric(horizontal=14, vertical=5),
                 border=ft.Border.only(bottom=ft.BorderSide(1, "#EDF1F6"))))
-        if not self.rows:
-            lines.append(T.empty_state(I.GRID_OFF, "沒有專案"))
-        self.body.controls = [ft.Row([ft.Column(lines, spacing=0)], scroll=ft.ScrollMode.AUTO)]
+        if T.MOBILE:                          # 手機：每個專案一張小卡，六個平台排成 3×2
+            short = {"WIN": "Windows", "MAC": "Mac", "WEB": "線上版", "IOS": "iPhone", "IPAD": "iPad", "AND": "Android"}
+            lines = []
+            for p in self.rows:
+                cells = []
+                for code, name, icon, tone in PLATFORMS:
+                    r = p["platforms"].get(code) or {}
+                    s = r.get("status", 0)
+                    label, stone = PLT_STATUS[s]
+                    bg, fg = T.TONES[stone]
+                    cells.append(ft.Container(ft.Column([
+                        ft.Text(short.get(code, name), size=10, color=T.MUTED, max_lines=1),
+                        ft.Text(label + ((" " + r["version"]) if r.get("version") else ""), size=11, max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS, weight=ft.FontWeight.W_700,
+                                color=fg if s not in (0, 9) else "#94A3B8")], spacing=0,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                        col=4, height=42, border_radius=8, alignment=ft.Alignment.CENTER,
+                        bgcolor=bg if s not in (0, 9) else "#F8FAFC", ink=self.can,
+                        on_click=(lambda e, p=p, c=code: self.edit(p, c)) if self.can else None))
+                lines.append(ft.Container(ft.Column([
+                    ft.Text(p["display"], size=14, weight=ft.FontWeight.W_700, max_lines=2,
+                            overflow=ft.TextOverflow.ELLIPSIS),
+                    T.muted(p["name"], 11),
+                    ft.ResponsiveRow(cells, spacing=6, run_spacing=6)], spacing=4),
+                    padding=12, border=ft.Border.only(bottom=ft.BorderSide(1, "#EDF1F6"))))
+            if not self.rows:
+                lines.append(T.empty_state(I.GRID_OFF, "沒有專案"))
+            self.body.controls = [ft.Column(lines, spacing=0, data=T.READY)]
+        else:
+            if not self.rows:
+                lines.append(T.empty_state(I.GRID_OFF, "沒有專案"))
+            self.body.controls = [ft.Row([ft.Column(lines, spacing=0)], scroll=ft.ScrollMode.AUTO)]
         self.sum.controls = [T.muted("已發佈：", 12)] + [T.chip("%s %d" % (n, done[c]), "green", size=11)
                                                        for c, n, *_ in PLATFORMS]
         if update:
@@ -243,11 +272,16 @@ class Sync(ft.Column):
         super().__init__([
             T.page_header(I.SYNC, "彙整 GitHub", "抓專案清單、README（專案主題）、最新發佈版本；便利貼與分類不會被覆蓋",
                           "teal"),
-            T.card(ft.Column([ft.Row([T.icon_tile(I.CLOUD_SYNC, "teal", 44),
-                                      ft.Column([ft.Text("彙整", size=17, weight=ft.FontWeight.W_700), self.last],
-                                                spacing=0, expand=True),
-                                      self.go_btn if can_sync else T.chip("沒有彙整權限", "slate"),
-                                      T.btn("停止", I.STOP, lambda e: self.stop(), kind="outline")]),
+            T.card(ft.Column(([ft.Row([T.icon_tile(I.CLOUD_SYNC, "teal", 44),
+                                       ft.Column([ft.Text("彙整", size=17, weight=ft.FontWeight.W_700), self.last],
+                                                 spacing=0, expand=True)]),
+                               ft.Row([self.go_btn if can_sync else T.chip("沒有彙整權限", "slate")], wrap=True)]
+                              if T.MOBILE else          # 手機：按鈕放下一列（彙整在電腦上執行，不能中途停止）
+                              [ft.Row([T.icon_tile(I.CLOUD_SYNC, "teal", 44),
+                                       ft.Column([ft.Text("彙整", size=17, weight=ft.FontWeight.W_700), self.last],
+                                                 spacing=0, expand=True),
+                                       self.go_btn if can_sync else T.chip("沒有彙整權限", "slate"),
+                                       T.btn("停止", I.STOP, lambda e: self.stop(), kind="outline")])]) + [
                               self.free, self.bar, self.msg,
                               ft.Container(self.log, bgcolor="#F7F9FC", border_radius=10, padding=10)], spacing=10),
                    padding=20),

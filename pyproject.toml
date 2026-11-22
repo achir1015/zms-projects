@@ -1,10 +1,11 @@
 [project]
 name = "zms-projects"
-version = "1.1.0"
+version = "1.2.0"
 description = "資料助秘專案彙整"
 authors = [{ name = "吳玉柱" }]
 requires-python = ">=3.10"
-dependencies = ["flet==1.1.2", "flet-audio==1.1.2", "pymysql>=1.1", "qrcode>=7", "pillow"]
+# 手機 App（flet build ipa／apk）用；電腦版另見 tools/build_windows.py、tools/build_macos.sh（另需 qrcode、pillow、flet-web）
+dependencies = ["flet==1.1.2", "flet-audio==1.1.2", "pymysql>=1.1", "certifi"]
 
 [tool.flet]
 org = "com.achir"
@@ -16,7 +17,8 @@ copyright = "© 2026 吳玉柱"
 path = "."
 exclude = ["tests", "tools", "packaging", "data", ".venv", "dist", "dist-installer", "build", "docs", "run_web.py",
            "*.spec", "assets/icon.ico", "*.log", "dist-mac", "build-mac", "dist-android", "dist-ios", "android",
-           "data_mobile", "run_web_mobile.py", "run_web_tablet.py", "*.pdf", "*.zmsgl"]
+           "data_mobile", "run_web_mobile.py", "run_web_tablet.py", "*.pdf", "*.zmsgl", ".claude", "README.md", "web.log",
+           "build-win.log", "build-mac.log", "build-ios.log"]
 
 [tool.flet.deep_linking]
 scheme = "zmsprojects"

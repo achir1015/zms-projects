@@ -79,7 +79,7 @@ def _plat(platform=None):
 
 
 def asset_suffix(platform=None):
-    return {"windows": "-Setup-", "mac": "-mac.dmg", "android": "-android.apk"}.get(_plat(platform), "")
+    return {"windows": "-Setup-", "mac": "-mac.dmg", "android": "-android.apk", "ios": "-ios.ipa"}.get(_plat(platform), "")
 
 
 def asset_name(ver, platform=None):
@@ -136,7 +136,7 @@ def check_update(timeout=8, platform=None):
         return None
     suffix = asset_suffix(platform)
     asset = next((a for a in rel.get("assets", []) if suffix and suffix in a["name"]
-                  and a["name"].lower().endswith((".exe", ".dmg", ".apk"))), None)
+                  and a["name"].lower().endswith((".exe", ".dmg", ".apk", ".ipa"))), None)
     return dict(version=tag.lstrip("vV"), notes=rel.get("body") or "", url=asset["browser_download_url"] if asset
                 else rel.get("html_url"), size=asset["size"] if asset else 0, name=asset["name"] if asset else "",
                 page=rel.get("html_url"))

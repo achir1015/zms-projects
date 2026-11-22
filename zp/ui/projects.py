@@ -46,7 +46,7 @@ class Projects(ft.Row):
         self.can_cat = b.can("CAT", 2)
         self.can_plt = b.can("PLT", 2)
         self.can_task = b.can("TASK", 2)
-        self.search = T.field("搜尋專案主題、名稱、說明、語言、備忘…", "", prefix_icon=I.SEARCH, expand=True,
+        self.search = T.field("搜尋主題、名稱、說明…" if T.MOBILE else "搜尋專案主題、名稱、說明、語言、備忘…", "", prefix_icon=I.SEARCH, expand=True,
                               on_change=lambda e: self.refresh(reset=True))
         self.sort_dd = T.dropdown("排序", SORTS, "pushed", width=150, filterable=False,
                                   on_select=lambda e: self.set_sort(e.control.value))
@@ -58,17 +58,25 @@ class Projects(ft.Row):
         self.more = ft.Container()
         self.count = T.muted("", 12)
         self.detail = ft.Column(spacing=12, scroll=ft.ScrollMode.AUTO, expand=True)
-        self.detail_box = T.card(self.detail, width=520, padding=18, visible=False)
+        self.replace = T.MOBILE or T.TABLET   # 手機、iPad：明細取代清單（寬度不夠並排）
+        self.detail_box = T.card(self.detail, width=None if self.replace else 520, padding=14 if T.MOBILE else 18,
+                                 visible=False, expand=bool(T.TABLET))
         head = [T.btn("新增專案", I.ADD, lambda e: self.add_dialog(), kind="outline")] if self.can_note else []
         if b.can("SYNC", 2):
             head.append(T.btn("彙整 GitHub", I.SYNC, lambda e: ctx.app.go("sync")))
-        left = ft.Column([
+        if T.MOBILE:                          # 手機：搜尋自己一列，排序與狀態在下一列
+            self.search.expand = False
+            tools = ft.Column([self.search, ft.Row([self.sort_dd, self.status_dd], spacing=8, wrap=True)], spacing=8)
+        else:
+            tools = ft.Row([self.search, self.sort_dd, self.status_dd], spacing=10)
+        self.list_col = left = ft.Column([
             T.page_header(I.APPS, "專案總覽", "按卡片看詳細內容；README 大標題就是專案主題", "blue", head),
-            ft.Row([self.search, self.sort_dd, self.status_dd], spacing=10),
+            tools,
             self.filter_row, self.tabs,
             ft.Container(ft.Column([self.grid, self.more, self.count], spacing=12, scroll=ft.ScrollMode.AUTO,
                                    expand=True), expand=True)], spacing=12, expand=True)
-        super().__init__([left, self.detail_box], expand=True, spacing=16, vertical_alignment=ft.CrossAxisAlignment.START)
+        super().__init__([left, self.detail_box], expand=True, spacing=16, vertical_alignment=ft.CrossAxisAlignment.START,
+                         data="split" if T.MOBILE else None)
         self.reload(update=False)
         if open:
             self.show(open, update=False)
@@ -185,6 +193,8 @@ class Projects(ft.Row):
         self.cur = p
         self.section = section
         self.detail_box.visible = True
+        if self.replace:                      # 手機、iPad：明細取代清單，按「返回」回到清單
+            self.list_col.visible = False
         self.render_detail()
         self.refresh(update=False)
         if update:
@@ -193,6 +203,7 @@ class Projects(ft.Row):
     def close_detail(self):
         self.sel = None
         self.detail_box.visible = False
+        self.list_col.visible = True
         self.refresh()
 
     def render_detail(self):
@@ -219,7 +230,8 @@ class Projects(ft.Row):
                                ft.TextButton(p["name"], icon=I.LINK, on_click=lambda e: self.ctx.open_url(p["url"]),
                                              disabled=not p.get("url"), style=ft.ButtonStyle(padding=0))],
                               spacing=0, expand=True),
-                    ft.IconButton(I.CLOSE, on_click=lambda e: self.close_detail(), tooltip="關閉")],
+                    ft.IconButton(I.ARROW_BACK if self.replace else I.CLOSE, on_click=lambda e: self.close_detail(),
+                                  tooltip="返回清單" if self.replace else "關閉")],
                    vertical_alignment=ft.CrossAxisAlignment.START),
             ft.Row([T.muted(meta, 12)] + flags, wrap=True, spacing=6),
             cat_row, bar, self.section_body()]

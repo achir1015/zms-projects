@@ -20,6 +20,13 @@ class Help(ft.Row):
         self.token = 0
         self.toc = ft.Column(spacing=4, scroll=ft.ScrollMode.AUTO, expand=True)
         self.stage = ft.Column(spacing=18, scroll=ft.ScrollMode.AUTO, expand=True)
+        if T.MOBILE:                          # 手機：目錄改成下拉選單，教學內容一欄
+            self.pick = T.dropdown("選擇課程", [(x["key"], "%d. %s" % (i + 1, x["title"])) for i, x in enumerate(LESSONS)],
+                                   self.sec, filterable=False, on_select=lambda e: self.show(e.control.value))
+            super().__init__([ft.Column([self.pick, T.card(self.stage, padding=14)], spacing=12, expand=True,
+                                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH)], expand=True)
+            self.show(self.sec, update=False, autoplay=bool(kw.get("lesson")))
+            return
         super().__init__([T.card(ft.Column([T.title_text("教學目錄", 16), self.toc,
                                             T.muted("%s v%s\n開發：吳玉柱 先生 與 Claude AI Opus 5.5" % (APP_NAME, APP_VERSION), 11)],
                                            spacing=10), width=280, padding=14),
@@ -32,6 +39,8 @@ class Help(ft.Row):
         self.ctx.stop_voice()
         self.sec = key
         g = BY_KEY[key]
+        if getattr(self, "pick", None) is not None:
+            self.pick.value = key
         self.toc.controls = [ft.Container(ft.Row([
             ft.Text("%d" % (i + 1), size=13, color=ft.Colors.WHITE if s["key"] == key else T.MUTED, width=18),
             ft.Text(s["title"], size=14, weight=ft.FontWeight.W_700 if s["key"] == key else None,
@@ -42,7 +51,7 @@ class Help(ft.Row):
         row = []
         app = self.ctx.app
         for i, (icon, tone, text, sid) in enumerate(g["steps"]):
-            if i:
+            if i and not T.MOBILE:
                 row.append(ft.Icon(I.ARROW_FORWARD_ROUNDED, color="#94A3B8", size=22))
             can = bool(app.find(sid))
             tile = ft.Container(ft.Column([
@@ -53,7 +62,7 @@ class Help(ft.Row):
                 ft.TextButton("跟著做", icon=I.TOUCH_APP, on_click=lambda e, s=sid: self.follow(s), disabled=not can,
                               tooltip="開啟這一步的畫面" if can else "您沒有此功能的權限")],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=6),
-                width=150, padding=12, border_radius=16, opacity=0.4,
+                width=130 if T.MOBILE else 150, padding=12, border_radius=16, opacity=0.4,
                 animate_opacity=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
                 animate_scale=ft.Animation(400, ft.AnimationCurve.EASE_OUT_BACK), scale=0.92,
                 border=ft.Border.all(3, "#00000000"))
@@ -61,11 +70,14 @@ class Help(ft.Row):
             row.append(tile)
         idx = [s["key"] for s in LESSONS].index(key)
         self.play_btn = T.btn("播放語音教學", I.PLAY_CIRCLE, lambda e: self.play())
+        stop_btn = T.btn("停止", I.STOP_CIRCLE, lambda e: self.stop(), kind="outline")
+        title = ft.Column([T.muted("第 %d 課，共 %d 課" % (idx + 1, len(LESSONS)), 12),
+                           T.title_text(g["title"], 18 if T.MOBILE else 22)], spacing=0, expand=True)
         self.stage.controls = [
-            ft.Row([T.icon_tile(I.RECORD_VOICE_OVER, "rose", 52, radius=16),
-                    ft.Column([T.muted("第 %d 課，共 %d 課" % (idx + 1, len(LESSONS)), 12), T.title_text(g["title"], 22)],
-                              spacing=0, expand=True),
-                    self.play_btn, T.btn("停止", I.STOP_CIRCLE, lambda e: self.stop(), kind="outline")], spacing=14),
+            ft.Column([ft.Row([T.icon_tile(I.RECORD_VOICE_OVER, "rose", 44, radius=14), title], spacing=10),
+                       ft.Row([self.play_btn, stop_btn], spacing=8, wrap=True)], spacing=10) if T.MOBILE else
+            ft.Row([T.icon_tile(I.RECORD_VOICE_OVER, "rose", 52, radius=16), title, self.play_btn, stop_btn],
+                   spacing=14),
             ft.Container(ft.Row(row, wrap=True, spacing=8, run_spacing=12,
                                 vertical_alignment=ft.CrossAxisAlignment.CENTER), padding=10),
             ft.Container(ft.Text(g["voice"], size=15, color=T.TEXT), bgcolor="#F7F9FC", border_radius=14, padding=18),
