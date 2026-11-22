@@ -22,6 +22,9 @@ if __name__ == "__main__":
     assets = os.path.join(resource_dir(), "assets")
     port = os.environ.get("ZP_WEB_PORT")
     if port:
-        ft.run(main, view=None, port=int(port), host="127.0.0.1", assets_dir=assets)
+        host = os.environ.get("ZP_WEB_HOST", "127.0.0.1")
+        # 打包版的 PyInstaller 執行期掛勾會把 FLET_SERVER_IP 固定成 127.0.0.1（它優先於 host 參數），線上版要改回來
+        os.environ["FLET_SERVER_IP"] = host
+        ft.run(main, view=None, port=int(port), host=host, assets_dir=assets)
     else:
         ft.run(main, assets_dir=assets)

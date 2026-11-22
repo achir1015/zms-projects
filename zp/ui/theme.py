@@ -411,6 +411,81 @@ class Ctx:
         self.page = app.page
         self.books = app.books
         self.reports = app.reports
+        # 線上版（瀏覽器）：檔案改上傳／下載、語音在瀏覽器播放（各分頁各自一個播放器）
+        self.web = bool(getattr(app.page, "web", False)) or MOBILE
+        self._audio = None
+
+    # ---------------------------------------------------------- 語音
+    def say_help(self, key, text):
+        from ..voice import help_mp3, speaker
+        if not self.web:
+            speaker.say_help(key, text)
+            return
+        self.stop_voice()
+        if not help_mp3(key):
+            self.toast("線上版只播放預錄的教學語音", True)
+            return
+        import flet_audio as fa
+        self._audio = fa.Audio(src="voice/%s.mp3" % key, autoplay=True,
+                               on_state_change=lambda e: self._audio_state(e))
+        self._audio_on = True
+        self.page.services.append(self._audio)
+        self.page.update()
+
+    def _audio_state(self, e):
+        if "complet" in str(getattr(e, "state", "")).lower() or "stop" in str(getattr(e, "state", "")).lower():
+            self._audio_on = False
+
+    def voice_playing(self):
+        from ..voice import speaker
+        if not self.web:
+            return speaker.playing()
+        return self._audio is not None and getattr(self, "_audio_on", False)
+
+    def stop_voice(self):
+        from ..voice import speaker
+        if not self.web:
+            speaker.stop()
+            return
+        a, self._audio = self._audio, None
+        self._audio_on = False
+        if a is not None:
+            try:
+                self.page.run_task(a.pause)
+            except Exception:
+                pass
+            try:
+                self.page.services.remove(a)
+                self.page.update()
+            except Exception:
+                pass
+
+    # ---------------------------------------------------------- 檔案（電腦版用路徑、線上版用上傳的內容）
+    async def pick_bytes(self, title, exts):
+        """選一個檔案，回傳 (檔名, 內容 bytes)；沒選回傳 (None, None)。"""
+        files = await ft.FilePicker().pick_files(dialog_title=title, allowed_extensions=exts, with_data=self.web)
+        if not files:
+            return None, None
+        f = files[0]
+        if f.bytes:
+            return f.name, bytes(f.bytes)
+        if f.path and os.path.isfile(f.path):
+            with open(f.path, "rb") as fh:
+                return f.name or os.path.basename(f.path), fh.read()
+        return None, None
+
+    async def save_download(self, filename, data):
+        """把產生的檔案交給使用者：電腦版另存新檔、線上版下載到瀏覽器。回傳存檔路徑或檔名。"""
+        ext = filename.rsplit(".", 1)[-1]
+        if self.web:
+            path = await ft.FilePicker().save_file(dialog_title="儲存檔案", file_name=filename,
+                                                   allowed_extensions=[ext], src_bytes=data)
+            return path or filename
+        path = await self.save_as(filename, ext)
+        if path:
+            with open(path, "wb") as f:
+                f.write(data)
+        return path
 
     def toast(self, msg, error=False):
         self.page.show_dialog(ft.SnackBar(
@@ -473,8 +548,8 @@ class Ctx:
         return path
 
     async def save_generated(self, filename, writer, open_after=True):
-        """產生檔案（writer(path) 負責寫入）：電腦版另存後開啟；手機版存到手機。"""
-        if MOBILE:
+        """產生檔案（writer(path) 負責寫入）：電腦版另存後開啟；手機版、線上版下載。"""
+        if MOBILE or self.web:
             import tempfile
             p = os.path.join(tempfile.gettempdir(), filename)
             writer(p)
@@ -490,7 +565,7 @@ class Ctx:
 
     async def pick_csv(self, title):
         """選 CSV 檔，回傳本機路徑（手機版讀入內容後存到暫存檔）。"""
-        files = await ft.FilePicker().pick_files(dialog_title=title, allowed_extensions=["csv"], with_data=MOBILE)
+        files = await ft.FilePicker().pick_files(dialog_title=title, allowed_extensions=["csv"], with_data=MOBILE or self.web)
         if not files:
             return ""
         f = files[0]
@@ -517,7 +592,7 @@ class Ctx:
             if not grid.data_rows:
                 self.toast("沒有資料可以匯出", True)
                 return
-            if MOBILE:
+            if MOBILE or self.web:
                 await self.save_bytes("%s_%s.csv" % (name, rocdate.today().strftime("%Y%m%d")),
                                       grid.csv_text().encode("utf-8-sig"))
                 return

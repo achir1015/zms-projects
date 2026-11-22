@@ -102,19 +102,22 @@ class Matrix(ft.Column):
 
     async def export(self, e):
         import csv
-        path = await self.ctx.save_as("平台進度_%s.csv" % rocdate.today().strftime("%Y%m%d"), "csv")
+        import io
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["專案主題", "專案名稱", "分類"] + [n for c, n, *_ in PLATFORMS])
+        for p in self.rows:
+            w.writerow([p["display"], p["name"], "、".join(c["name"] for c in p["cats"])] +
+                       [("%s %s" % (PLT_STATUS[(p["platforms"].get(c) or {}).get("status", 0)][0],
+                                    (p["platforms"].get(c) or {}).get("version") or "")).strip()
+                        for c, *_ in PLATFORMS])
+        path = await self.ctx.save_download("平台進度_%s.csv" % rocdate.today().strftime("%Y%m%d"),
+                                            buf.getvalue().encode("utf-8-sig"))
         if not path:
             return
-        with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.writer(f)
-            w.writerow(["專案主題", "專案名稱", "分類"] + [n for c, n, *_ in PLATFORMS])
-            for p in self.rows:
-                w.writerow([p["display"], p["name"], "、".join(c["name"] for c in p["cats"])] +
-                           [("%s %s" % (PLT_STATUS[(p["platforms"].get(c) or {}).get("status", 0)][0],
-                                        (p["platforms"].get(c) or {}).get("version") or "")).strip()
-                            for c, *_ in PLATFORMS])
         self.ctx.toast("已匯出：%s" % os.path.basename(path))
-        T.open_file(path)
+        if not self.ctx.web:
+            T.open_file(path)
 
 
 # ====================================================================== 待辦事項
@@ -216,6 +219,9 @@ class Sync(ft.Column):
         self.forks = T.switch("顯示 Fork 來的專案", st.get("include_forks", 1), disabled=not self.is_sys)
         self.auto = T.switch("開程式時自動彙整", st.get("auto_sync", 0), disabled=not self.is_sys)
         self.free = T.switch("不使用 API 查發佈版本（較慢，但不扣次數）", False)
+        self.pages = T.field("線上版儲存庫", st.get("pages_repo"), width=300, read_only=not self.is_sys,
+                             hint_text="例如 achir1015/zms-projects", prefix_icon=I.LANGUAGE)
+        self.pub_msg = T.muted("上次發佈：%s" % (T.show(st.get("pages_at")) or "尚未發佈"), 12)
         self.bar = ft.ProgressBar(value=0, color=T.ACCENT, bgcolor="#E6F4F1", bar_height=8, border_radius=4,
                                   visible=False)
         self.msg = ft.Text("", size=13, color=T.TEXT, selectable=True)
@@ -224,10 +230,12 @@ class Sync(ft.Column):
         self.stop_flag = False
         self.last = T.muted("", 12)
         last = "上次彙整：%s　%s" % (T.show(st.get("last_sync_at")) or "尚未彙整", st.get("last_sync_note") or "")
-        cfg = [self.cname, ft.Row([self.owner, self.token], wrap=True), ft.Row([self.forks, self.auto], wrap=True, spacing=24),
+        cfg = [ft.Row([self.cname, self.pages], wrap=True), ft.Row([self.owner, self.token], wrap=True),
+               ft.Row([self.forks, self.auto], wrap=True, spacing=24),
                T.muted("沒有 Token 時，GitHub 每小時只允許 60 次查詢；專案多時部分發佈版本會改用發佈頁查詢（較慢但不扣次數）。"
                        "Token 可在 GitHub → Settings → Developer settings → Fine-grained tokens 建立，權限選 Contents: "
-                       "Read-only；有 Token 也能看到私人專案。Token 只存在本系統的資料庫，只有系統管理權限看得到。", 12)]
+                       "Read-only（要發佈線上版則選 Read and write）；有 Token 也能看到私人專案。"
+                       "Token 只存在本系統的資料庫，只有系統管理權限看得到。", 12)]
         if self.is_sys:
             cfg.append(ft.Row([T.btn("儲存設定", I.SAVE, lambda e: self.save())]))
         self.last.value = last
@@ -246,6 +254,14 @@ class Sync(ft.Column):
             T.card(ft.Column([ft.Row([T.icon_tile(I.SETTINGS, "blue", 36),
                                       ft.Text("GitHub 設定", size=16, weight=ft.FontWeight.W_700)])] + cfg, spacing=12),
                    padding=20),
+            T.card(ft.Column([ft.Row([T.icon_tile(I.PUBLIC, "sky", 44), ft.Column([
+                ft.Text("發佈線上版", size=17, weight=ft.FontWeight.W_700),
+                T.muted("把公開專案的主題、說明、版本、連結、分類與平台進度送到 GitHub Pages，任何人用瀏覽器就能看；"
+                        "私人專案、便利貼備註、待辦與負責人不會送出。", 12), self.pub_msg,
+                ft.Row([T.btn("發佈線上版", I.PUBLISH, self.publish, kind="accent", disabled=not can_sync),
+                        T.btn("開啟線上版", I.OPEN_IN_NEW, lambda e: self.open_online(), kind="outline")],
+                       spacing=10, wrap=True)], spacing=6, expand=True)], spacing=12,
+                vertical_alignment=ft.CrossAxisAlignment.START)]), padding=20),
             ft.Row([
                 io_card(I.HTML, "orange", "匯入舊版彙整網頁", "讀取「Achir1015專案彙整.html」裡的專案快照（含 README）",
                         T.btn("選擇網頁檔", I.UPLOAD_FILE, self.import_html, kind="outline", disabled=not can_sync)),
@@ -255,9 +271,39 @@ class Sync(ft.Column):
                         T.btn("匯出", I.SAVE_ALT, self.export_backup, kind="outline"))], spacing=14, data="split")],
             spacing=14, expand=True, scroll=ft.ScrollMode.AUTO)
 
-    def save(self):
-        self.ctx.guard(self.ctx.books.save_company, name=self.cname.value, github_owner=self.owner.value, github_token=self.token.value,
-                       include_forks=self.forks.value, auto_sync=self.auto.value, ok="GitHub 設定已儲存")
+    def save(self, ok="GitHub 設定已儲存"):
+        return self.ctx.guard(self.ctx.books.save_company, name=self.cname.value, github_owner=self.owner.value,
+                              github_token=self.token.value, include_forks=self.forks.value,
+                              auto_sync=self.auto.value, pages_repo=self.pages.value, ok=ok)
+
+    def online_url(self):
+        repo = (self.pages.value or "").strip() or "achir1015/zms-projects"
+        owner, _, name = repo.partition("/")
+        return "https://%s.github.io/%s/app/" % (owner.lower(), name)
+
+    def open_online(self):
+        self.ctx.open_url(self.online_url())
+
+    def publish(self, e):
+        if self.is_sys and not self.save(ok=None):
+            return
+        self.pub_msg.value = "發佈中…"
+        self.update()
+
+        def work():
+            try:
+                r = self.ctx.books.publish_online()
+            except Exception as ex:
+                self.pub_msg.value = "發佈失敗：%s" % ex
+                self.ctx.toast(str(ex), True)
+            else:
+                self.pub_msg.value = "已發佈 %d 個公開專案（約 1 分鐘後線上版更新）：%s" % (r["count"], r["url"] + "app/")
+                self.ctx.toast("線上版已發佈")
+            try:
+                self.update()
+            except Exception:
+                pass
+        threading.Thread(target=work, daemon=True).start()
 
     def say(self, text, done=0, total=0):
         self.msg.value = text
@@ -278,9 +324,7 @@ class Sync(ft.Column):
             self.ctx.toast("彙整中，請稍候", True)
             return
         if self.is_sys:
-            if not self.ctx.guard(self.ctx.books.save_company, name=self.cname.value, github_owner=self.owner.value,
-                                  github_token=self.token.value, include_forks=self.forks.value,
-                                  auto_sync=self.auto.value):
+            if not self.save(ok=None):
                 return
         Sync.running = True
         self.stop_flag = False
@@ -309,10 +353,14 @@ class Sync(ft.Column):
         threading.Thread(target=work, daemon=True).start()
 
     async def import_html(self, e):
-        files = await ft.FilePicker().pick_files(dialog_title="選擇舊版專案彙整網頁", allowed_extensions=["html", "htm"])
-        if not files:
+        name, data = await self.ctx.pick_bytes("選擇舊版專案彙整網頁", ["html", "htm"])
+        if data is None:
             return
-        r = self.ctx.guard(self.ctx.books.import_html, files[0].path)
+        import tempfile
+        tmp = os.path.join(tempfile.gettempdir(), "zp_import_%d.html" % os.getpid())
+        with open(tmp, "wb") as f:
+            f.write(data)
+        r = self.ctx.guard(self.ctx.books.import_html, tmp)
         if isinstance(r, dict):
             n = self.ctx.guard(self.ctx.books.auto_classify) if self.ctx.books.can("CAT", 2) else 0
             self.say("匯入完成：共 %(total)d 個專案，新增 %(new)d、更新 %(updated)d" % r +
@@ -320,12 +368,11 @@ class Sync(ft.Column):
             self.ctx.toast("匯入完成")
 
     async def import_backup(self, e):
-        files = await ft.FilePicker().pick_files(dialog_title="選擇備份檔", allowed_extensions=["json"])
-        if not files:
+        name, raw = await self.ctx.pick_bytes("選擇備份檔", ["json"])
+        if raw is None:
             return
         try:
-            with open(files[0].path, encoding="utf-8-sig") as f:
-                data = json.load(f)
+            data = json.loads(raw.decode("utf-8-sig"))
         except Exception as ex:
             self.ctx.toast("讀不到備份檔：%s" % ex, True)
             return
@@ -339,10 +386,9 @@ class Sync(ft.Column):
         data = self.ctx.guard(self.ctx.books.export_backup)
         if not isinstance(data, dict):
             return
-        path = await self.ctx.save_as("專案彙整備份_%s.json" % time.strftime("%Y%m%d_%H%M"), "json")
+        path = await self.ctx.save_download("專案彙整備份_%s.json" % time.strftime("%Y%m%d_%H%M"),
+                                            json.dumps(data, ensure_ascii=False, indent=1).encode("utf-8"))
         if path:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=1)
             self.ctx.books.log("export_backup", os.path.basename(path))
             self.ctx.toast("已匯出：%s" % os.path.basename(path))
 

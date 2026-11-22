@@ -213,6 +213,7 @@ class Update(ft.Column):
                           ft.Icons.DESKTOP_MAC if MAC else ft.Icons.DESKTOP_WINDOWS, lambda e: self.shortcut(),
                           kind="accent")],
                     spacing=10), width=340, padding=22)], spacing=14, vertical_alignment=ft.CrossAxisAlignment.START, data="split"),
+            self.web_card(),
             T.card(ft.Column([ft.Text("系統資訊", size=15, weight=ft.FontWeight.W_700),
                               T.muted("系統開發：吳玉柱 先生 與 Claude AI Opus 5.5", 13),
                               T.muted("資料庫：MariaDB　介面：Flet　語音：微軟神經語音／Windows 內建語音", 13)],
@@ -287,6 +288,83 @@ class Update(ft.Column):
             self.ctx.page.run_task(self.ctx.page.window.destroy)
         self.ctx.page.run_thread(work)
 
+    # ---------------------------------------------------------------- 公司內的線上版
+    def web_card(self):
+        from .. import webserve
+        ex = self.ctx.app.st.extra
+        can = self.ctx.books.can("SYS", 2)
+        self.web_switch = T.switch("開啟線上版（同一個網路的電腦、平板用瀏覽器登入使用）", bool(ex.get("web_enabled")),
+                                   on_change=self.toggle_web, disabled=not can)
+        self.web_port = T.field("埠", str(ex.get("web_port") or webserve.DEFAULT_PORT), width=110,
+                                keyboard_type=ft.KeyboardType.NUMBER, disabled=not can)
+        self.web_box = ft.Column(spacing=10)
+        self.render_web()
+        return T.card(ft.Column([
+            ft.Row([T.icon_tile(ft.Icons.LANGUAGE, "sky", 44), ft.Column([
+                ft.Text("公司內的線上版", size=17, weight=ft.FontWeight.W_700),
+                T.muted("這台電腦提供網頁版，畫面與資料都和這裡相同" + ("" if can else "（需要系統管理權限才能開關）"), 12)],
+                spacing=2, expand=True)], spacing=12),
+            ft.Row([self.web_switch, self.web_port], spacing=16, wrap=True), self.web_box], spacing=12), padding=22)
+
+    def render_web(self):
+        srv = self.ctx.app.web
+        if srv and srv.running:
+            from ..webserve import qr_png
+            rows = []
+            for u in srv.urls() or ["http://localhost:%d/" % srv.port]:
+                try:
+                    qr = ft.Image(src=qr_png(u), width=132, height=132)
+                except Exception:
+                    qr = ft.Container()
+                rows.append(ft.Row([qr, ft.Column([
+                    ft.Text(u, size=18, weight=ft.FontWeight.W_700, color=T.PRIMARY, selectable=True),
+                    ft.Row([T.btn("用瀏覽器開啟", ft.Icons.OPEN_IN_BROWSER, lambda e, x=u: self.ctx.open_url(x),
+                                  kind="outline")])], spacing=6)], spacing=16))
+            self.web_box.controls = [T.chip("服務執行中", "green", ft.Icons.LANGUAGE)] + rows + [
+                T.muted("平板掃 QR Code，或在瀏覽器輸入網址，用本系統的帳號登入（權限與這裡相同）。"
+                        "關閉這個程式時，線上版也會一起停止。", 12),
+                T.muted("第一次開啟時，若 Windows 防火牆／macOS 詢問是否允許連入，請按允許（私人網路）。"
+                        "線上版不提供：備份與還原、版本更新、資料庫設定。", 12)]
+        else:
+            self.web_box.controls = [T.muted("未開啟。打開開關後，同一個網路的電腦、平板就能用瀏覽器使用專案彙整。"
+                                             "另有不需安裝的公開展示版：https://achir1015.github.io/zms-projects/", 13)]
+
+    def toggle_web(self, e):
+        app = self.ctx.app
+        ex = app.st.extra
+        on = bool(self.web_switch.value)
+        if on:
+            try:
+                port = int(self.web_port.value or 0)
+                assert 1024 <= port <= 65535
+            except Exception:
+                self.web_switch.value = False
+                self.ctx.toast("埠請填 1024～65535 的數字", True)
+                self.update()
+                return
+            ex["web_port"] = port
+            app.stop_web()
+            self.web_box.controls = [ft.Row([ft.ProgressRing(width=20, height=20), ft.Text("正在啟動線上版…")])]
+            self.update()
+            try:
+                app.start_web()
+            except Exception as ex2:
+                self.web_switch.value = False
+                ex["web_enabled"] = False
+                app.st.save()
+                self.render_web()
+                self.ctx.toast("線上版無法啟動：%s" % ex2, True)
+                self.update()
+                return
+            self.ctx.books.log("web", "on :%d" % port)
+        else:
+            app.stop_web()
+            self.ctx.books.log("web", "off")
+        ex["web_enabled"] = on
+        app.st.save()
+        self.render_web()
+        self.update()
+
     def shortcut(self):
         self.ctx.guard(maintenance.create_desktop_shortcut, ok="桌面替身已建立" if MAC else "桌面捷徑已建立")
 
@@ -297,7 +375,8 @@ ACTIONS = {"login": "登入", "logout": "登出", "login_fail": "登入失敗", 
            "project_add": "新增專案", "project_delete": "刪除專案", "platform": "平台進度", "cat_add": "新增分類",
            "cat_save": "修改分類", "cat_delete": "刪除分類", "auto_classify": "自動分類", "task_save": "儲存待辦",
            "task_done": "完成待辦", "task_undo": "取消完成", "task_delete": "刪除待辦", "import_html": "匯入網頁",
-           "import_backup": "匯入備份", "export_backup": "匯出備份"}
+           "import_backup": "匯入備份", "export_backup": "匯出備份",
+           "web": "線上版服務", "publish": "發佈線上版"}
 
 
 class Audit(ft.Column):

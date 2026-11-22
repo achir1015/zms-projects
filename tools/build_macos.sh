@@ -26,7 +26,9 @@ iconutil -c icns "$SET" -o build-mac/icon.icns
 echo "== flet pack"
 .venv/bin/flet pack main.py -y -n ZMSProjects -i build-mac/icon.icns --distpath dist-mac \
   --add-data assets:assets \
-  --hidden-import edge_tts --hidden-import pymysql --hidden-import certifi \
+  --hidden-import edge_tts --hidden-import pymysql --hidden-import certifi --hidden-import qrcode \
+  --pyinstaller-build-args=--collect-all=flet_web --pyinstaller-build-args=--collect-all=flet_audio \
+  --pyinstaller-build-args=--collect-submodules=uvicorn \
   --product-name "$NAME" --product-version "$VER" --bundle-id "$BUNDLE_ID" --copyright "© 2026 吳玉柱"
 
 APP=dist-mac/ZMSProjects.app

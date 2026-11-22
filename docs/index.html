@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>資料助秘專案彙整</title>
+<meta name="description" content="把 GitHub 上的所有專案集中管理：README 大標題當主題、最新版本與下載、App Store／Play／影片／線上版連結、分類頁簽、六平台進度與待辦。">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0&display=block">
+<style>
+:root{
+  --bg:#F2F5FA;--card:#fff;--ink:#1F2937;--muted:#64748B;--line:#E2E8F0;--primary:#1E4D8C;--navy:#13294B;
+  --teal:#0FA294;--gold:#E0A526;--soft:#F7F9FC;--hl:#FFF8E6;
+  --t-blue:#E3EDFB;--f-blue:#1E4D8C;--t-teal:#DDF5F1;--f-teal:#0F766E;--t-amber:#FDF1D8;--f-amber:#B45309;
+  --t-violet:#EDE7FB;--f-violet:#6D28D9;--t-green:#DCF5E6;--f-green:#15803D;--t-rose:#FCE4E8;--f-rose:#BE123C;
+  --t-slate:#E7ECF2;--f-slate:#475569;--t-sky:#DDF0FB;--f-sky:#0369A1;--t-orange:#FDE9DA;--f-orange:#C2410C;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F172A;--card:#162033;--ink:#E5E7EB;--muted:#94A3B8;--line:#26324A;--primary:#7FB0F0;--soft:#1B2740;--hl:#3A2F12;
+  --t-blue:#1C2D4A;--t-teal:#123532;--t-amber:#3A2E14;--t-violet:#2A2145;--t-green:#14321F;--t-rose:#3B1A23;--t-slate:#222C3D;--t-sky:#13304A;--t-orange:#3A2414;
+  --f-blue:#9CC2F5;--f-teal:#5EE0CF;--f-amber:#F5C66B;--f-violet:#C4B0FA;--f-green:#7EE0A2;--f-rose:#F7A0B2;--f-slate:#B8C4D4;--f-sky:#8BCFF5;--f-orange:#F7B184;}}
+:root[data-theme="dark"]{
+  --bg:#0F172A;--card:#162033;--ink:#E5E7EB;--muted:#94A3B8;--line:#26324A;--primary:#7FB0F0;--soft:#1B2740;--hl:#3A2F12;
+  --t-blue:#1C2D4A;--t-teal:#123532;--t-amber:#3A2E14;--t-violet:#2A2145;--t-green:#14321F;--t-rose:#3B1A23;--t-slate:#222C3D;--t-sky:#13304A;--t-orange:#3A2414;
+  --f-blue:#9CC2F5;--f-teal:#5EE0CF;--f-amber:#F5C66B;--f-violet:#C4B0FA;--f-green:#7EE0A2;--f-rose:#F7A0B2;--f-slate:#B8C4D4;--f-sky:#8BCFF5;--f-orange:#F7B184;}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC",system-ui,sans-serif;line-height:1.65}
+a{color:var(--primary)}
+.ms{font-family:"Material Symbols Rounded";font-weight:normal;font-style:normal;font-size:24px;line-height:1;
+  display:inline-block;white-space:nowrap;-webkit-font-feature-settings:"liga";font-feature-settings:"liga";-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+header.hero{background:linear-gradient(135deg,#13294B,#1E4D8C 55%,#0F766E);color:#fff;padding:44px 0 36px}
+.hero .top{display:flex;gap:18px;align-items:center}
+.hero img{width:84px;height:84px;border-radius:22px;background:#fff1;flex:none}
+.hero h1{margin:0;font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:.5px}
+.hero p{margin:6px 0 0;color:#C8D7EE}
+.hero .lead{font-size:18px;margin-top:22px;color:#fff;max-width:820px}
+.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;font-weight:700;text-decoration:none;
+  border:1px solid transparent;cursor:pointer;font-size:15px;font-family:inherit}
+.btn.gold{background:var(--gold);color:#3B2600}
+.btn.ghost{background:#ffffff1f;color:#fff;border-color:#ffffff40}
+.btn.pri{background:var(--primary);color:#fff}
+:root[data-theme="dark"] .btn.pri{color:#0F172A}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.pri{color:#0F172A}}
+.btn.out{background:transparent;color:var(--primary);border-color:var(--line)}
+.btn:disabled{opacity:.45;cursor:default}
+section{padding:34px 0 8px}
+h2{font-size:24px;margin:0 0 6px;font-weight:800}
+.sub{color:var(--muted);margin:0 0 18px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px}
+.feat{display:flex;gap:12px;align-items:flex-start}
+.tile{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:none}
+.feat b{display:block;font-size:16px}
+.feat span{color:var(--muted);font-size:14px}
+.tone-blue{background:var(--t-blue);color:var(--f-blue)}.tone-teal{background:var(--t-teal);color:var(--f-teal)}
+.tone-amber{background:var(--t-amber);color:var(--f-amber)}.tone-violet{background:var(--t-violet);color:var(--f-violet)}
+.tone-green{background:var(--t-green);color:var(--f-green)}.tone-rose{background:var(--t-rose);color:var(--f-rose)}
+.tone-slate{background:var(--t-slate);color:var(--f-slate)}.tone-sky{background:var(--t-sky);color:var(--f-sky)}
+.tone-orange{background:var(--t-orange);color:var(--f-orange)}
+/* 語音教學 */
+.lesson{display:grid;grid-template-columns:270px 1fr;gap:16px;align-items:start}
+.toc{display:flex;flex-direction:column;gap:4px;max-height:640px;overflow:auto}
+.toc button{all:unset;display:flex;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:15px}
+.toc button .n{color:var(--muted);width:20px;flex:none}
+.toc button[aria-current="true"]{background:var(--primary);color:#fff;font-weight:700}
+:root[data-theme="dark"] .toc button[aria-current="true"]{color:#0F172A}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .toc button[aria-current="true"]{color:#0F172A}}
+.toc button[aria-current="true"] .n{color:inherit}
+.toc button:focus-visible{outline:2px solid var(--gold)}
+.stage-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.stage-head h3{margin:0;font-size:22px;flex:1;min-width:200px}
+.steps{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:18px 0}
+.step{width:132px;padding:12px 8px;border-radius:16px;text-align:center;opacity:.35;transform:scale(.94);
+  transition:opacity .4s,transform .4s,background .4s,border-color .4s;border:2px solid transparent}
+.step .tile{margin:0 auto 8px;width:56px;height:56px;border-radius:16px}
+.step .tile .ms{font-size:28px}
+.step div.t{font-size:13px;font-weight:600}
+.step.on{opacity:1;transform:scale(1)}
+.step.cur{border-color:var(--gold);background:var(--hl);transform:scale(1.05)}
+.arrow{color:var(--muted)}
+.voice{background:var(--soft);border-radius:14px;padding:16px;font-size:15px}
+.figure{margin:14px 0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#F2F5FA}
+.figure img{display:block;width:100%;height:auto}
+.prog{height:4px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:10px}
+.prog i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s linear}
+/* 範例畫面 */
+.shots{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.shot{margin:0}
+.shot img{width:100%;height:auto;border-radius:14px;border:1px solid var(--line);display:block;cursor:zoom-in}
+.shot figcaption{font-size:14px;color:var(--muted);margin-top:6px}
+.zoom{position:fixed;inset:0;background:#000c;display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
+.zoom.show{display:flex}
+.zoom img{max-width:100%;max-height:100%;border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+td,th{border-bottom:1px solid var(--line);padding:10px 8px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600;white-space:nowrap}
+.note{font-size:14px;color:var(--muted)}
+td{overflow-wrap:anywhere}
+code{word-break:break-all}
+@media (max-width:520px){th,td{display:block;padding:4px 0}th{padding-top:12px}tr{display:block;border-bottom:1px solid var(--line)}td{border:0}}
+footer{padding:30px 0 40px;color:var(--muted);font-size:14px}
+.theme-toggle{position:absolute;top:14px;right:16px}
+@media (max-width:820px){
+  .lesson{grid-template-columns:1fr}
+  .toc{flex-direction:row;overflow-x:auto;max-height:none}
+  .toc button{white-space:nowrap}
+  .step{width:calc(50% - 30px)}
+  .arrow{display:none}
+}
+</style>
+</head>
+<body>
+<header class="hero" style="position:relative">
+  <button class="btn ghost theme-toggle" id="themeBtn" aria-label="切換深色／淺色"><span class="ms">contrast</span></button>
+  <div class="wrap">
+    <div class="top">
+      <img src="icon.png" alt="">
+      <div><h1>資料助秘專案彙整</h1><p>GitHub 專案集中管理 · 主題、版本、上架、影片與六平台進度一頁掌握</p></div>
+    </div>
+    <p class="lead">把 GitHub 上的每個專案整理成卡片：<b>README 大標題就是專案主題</b>，最新發佈版本與下載檔、App Store／Google Play／
+      示範影片／線上版連結自動找出來；再用分類頁簽、平台進度總表與待辦事項管理開發進度。</p>
+    <div class="btns">
+      <a class="btn gold" href="app/"><span class="ms">language</span>開啟線上版</a>
+      <a class="btn ghost" href="https://github.com/achir1015/zms-projects/releases/latest"><span class="ms">download</span>下載 Windows／macOS 版</a>
+      <a class="btn ghost" href="#lessons"><span class="ms">record_voice_over</span>語音教學</a>
+      <a class="btn ghost" href="#online"><span class="ms">lan</span>公司內的線上版</a>
+      <a class="btn ghost" href="https://github.com/achir1015/zms-projects"><span class="ms">code</span>GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section>
+    <h2>主要功能</h2>
+    <div class="grid">
+      <div class="card feat"><div class="tile tone-teal"><span class="ms">sync</span></div><div><b>一鍵彙整 GitHub</b><span>專案清單、README、最新發佈版本；ETag 快取，次數用完改用發佈頁查詢（不扣次數）</span></div></div>
+      <div class="card feat"><div class="tile tone-blue"><span class="ms">title</span></div><div><b>README 大標題＝主題</b><span>卡片最上面顯示 README 第一個大標題，例如「A13input A13輸入資料」</span></div></div>
+      <div class="card feat"><div class="tile tone-rose"><span class="ms">smart_display</span></div><div><b>播放媒體</b><span>README 裡的 mp4、GitHub 上傳影片、YouTube 自動列成播放按鈕</span></div></div>
+      <div class="card feat"><div class="tile tone-amber"><span class="ms">folder_special</span></div><div><b>分類頁簽</b><span>自訂分類、顏色與順序；依名稱規則自動分類</span></div></div>
+      <div class="card feat"><div class="tile tone-violet"><span class="ms">grid_view</span></div><div><b>六平台進度</b><span>Windows、Mac、線上版、iPhone、iPad、Android；依發佈檔自動標示已發佈</span></div></div>
+      <div class="card feat"><div class="tile tone-green"><span class="ms">admin_panel_settings</span></div><div><b>MariaDB＋使用者權限</b><span>七項功能 × 無／查詢／維護、操作紀錄、備份還原、程式內更新</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>線上版</h2>
+    <p class="sub">不用安裝，手機、平板、電腦用瀏覽器就能看所有公開專案。</p>
+    <div class="grid">
+      <a class="card feat" href="app/" style="text-decoration:none;color:inherit"><div class="tile tone-sky"><span class="ms">language</span></div><div><b>專案彙整線上版</b><span>搜尋、分類頁簽、篩選（發佈版本／App Store／Play／影片／線上版）、平台進度總表、README 與影片播放</span></div></a>
+      <div class="card feat"><div class="tile tone-orange"><span class="ms">publish</span></div><div><b>資料怎麼更新</b><span>桌面版「彙整 GitHub → 發佈線上版」把公開專案送到這裡；線上版的「即時更新」可再向 GitHub 取最新星星數與說明</span></div></div>
+      <div class="card feat"><div class="tile tone-slate"><span class="ms">lock</span></div><div><b>不公開的資料不會送出</b><span>私人專案、便利貼備註、待辦事項、負責人與帳號權限只留在自己的資料庫</span></div></div>
+    </div>
+  </section>
+
+  <section id="lessons">
+    <h2>語音動態教學</h2>
+    <p class="sub">與程式內相同的臺灣華語語音；按「播放」後，步驟會跟著旁白依序亮起。</p>
+    <div class="lesson">
+      <nav class="card toc" id="toc" aria-label="教學目錄"></nav>
+      <div class="card" id="stage" aria-live="polite">
+        <div class="stage-head">
+          <div class="tile tone-rose"><span class="ms">record_voice_over</span></div>
+          <div style="flex:1;min-width:200px"><div class="note" id="lno"></div><h3 id="ltitle"></h3></div>
+          <button class="btn pri" id="play"><span class="ms">play_circle</span>播放語音教學</button>
+          <button class="btn out" id="stop"><span class="ms">stop_circle</span>停止</button>
+        </div>
+        <div class="prog"><i id="bar"></i></div>
+        <div class="steps" id="steps"></div>
+        <div class="figure" id="fig" hidden><img id="figimg" alt=""></div>
+        <div class="voice" id="vtext"></div>
+        <div class="btns"><button class="btn out" id="prev"><span class="ms">chevron_left</span>上一課</button>
+          <button class="btn pri" id="next">下一課<span class="ms">chevron_right</span></button></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="online">
+    <h2>公司內的線上版</h2>
+    <p class="sub">便利貼、待辦、平台進度的維護都在自己電腦的 MariaDB，要在其他電腦、平板上編輯，就由這台電腦提供網頁服務。</p>
+    <div class="card">
+      <table>
+        <tr><th>開啟</th><td>桌面版「系統管理 → 版本更新與捷徑」→ 打開「公司內的線上版」。畫面會顯示網址與 QR Code（預設埠 8630）。</td></tr>
+        <tr><th>使用</th><td>同一個網路的電腦、平板用瀏覽器開網址，用本系統的帳號登入；畫面、資料、權限與桌面版相同。</td></tr>
+        <tr><th>檔案</th><td>匯入舊網頁、匯入備份從瀏覽器上傳；匯出備份、平台進度 Excel 會下載到瀏覽器。語音教學在瀏覽器播放。</td></tr>
+        <tr><th>不提供</th><td>備份與還原、版本更新、資料庫設定（只在那台電腦操作）。</td></tr>
+        <tr><th>停止</th><td>關掉開關，或關閉那台電腦上的專案彙整，線上版會一起停止。</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>下載與安裝</h2>
+    <div class="card">
+      <table>
+        <tr><th>Windows 11</th><td><code>ZMSProjects-Setup-&lt;版本&gt;.exe</code>（不需系統管理員權限，建立桌面捷徑；SmartScreen 請按「其他資訊」→「仍要執行」）</td></tr>
+        <tr><th>macOS 11 以上</th><td><code>ZMSProjects-&lt;版本&gt;-mac.dmg</code>（已經 Apple 公證）</td></tr>
+        <tr><th>線上版</th><td><a href="app/">https://achir1015.github.io/zms-projects/app/</a></td></tr>
+        <tr><th>iPhone／iPad、Android</th><td>陸續推出</td></tr>
+      </table>
+      <div class="btns"><a class="btn pri" href="https://github.com/achir1015/zms-projects/releases/latest"><span class="ms">download</span>前往下載</a></div>
+    </div>
+  </section>
+</main>
+<footer class="wrap">系統開發：吳玉柱 先生 與 Claude AI Opus 5.5 · <span id="ver"></span></footer>
+<div class="zoom" id="zoom" role="dialog" aria-label="放大圖片"><img alt=""></div>
+
+<script>
+(function(){
+  const root = document.documentElement;
+  try { const t = localStorage.getItem("zp-theme"); if (t) root.dataset.theme = t; } catch (e) {}
+  document.getElementById("themeBtn").onclick = () => {
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("zp-theme", root.dataset.theme); } catch (e) {}
+  };
+  const zoom = document.getElementById("zoom");
+  document.querySelectorAll(".shot img").forEach(img => img.onclick = () => { zoom.querySelector("img").src = img.src; zoom.classList.add("show"); });
+  zoom.onclick = () => zoom.classList.remove("show");
+  document.addEventListener("keydown", e => { if (e.key === "Escape") zoom.classList.remove("show"); });
+
+  const $ = id => document.getElementById(id);
+  const audio = new Audio();
+  let lessons = [], idx = 0, timer = null;
+
+  function stop() {
+    audio.pause(); clearInterval(timer); timer = null; $("bar").style.width = "0";
+    document.querySelectorAll(".step").forEach(s => s.classList.remove("on", "cur"));
+  }
+  function light(n) {
+    document.querySelectorAll(".step").forEach((s, i) => { s.classList.toggle("on", i <= n); s.classList.toggle("cur", i === n); });
+  }
+  function show(i, autoplay) {
+    stop(); idx = i; const g = lessons[i];
+    $("lno").textContent = `第 ${i + 1} 課，共 ${lessons.length} 課`;
+    $("ltitle").textContent = g.title;
+    $("vtext").textContent = g.voice;
+    $("steps").innerHTML = g.steps.map((s, k) => (k ? '<span class="ms arrow">arrow_forward</span>' : "") +
+      `<div class="step"><div class="tile tone-${s.tone}"><span class="ms">${s.icon}</span></div><div class="t">${s.text}</div></div>`).join("");
+    $("fig").hidden = !g.image; if (g.image) { $("figimg").src = g.image; $("figimg").alt = g.title; }
+    $("play").disabled = !g.audio; $("prev").disabled = i === 0; $("next").disabled = i === lessons.length - 1;
+    document.querySelectorAll("#toc button").forEach((b, k) => b.setAttribute("aria-current", k === i ? "true" : "false"));
+    const toc = $("toc"), cur = toc.children[i];          // 手機：目錄橫向捲到目前這一課
+    if (cur && toc.scrollWidth > toc.clientWidth) toc.scrollTo({left: cur.offsetLeft - (toc.clientWidth - cur.clientWidth) / 2, behavior: "smooth"});
+    if (autoplay) play();
+  }
+  function play() {
+    const g = lessons[idx]; if (!g.audio) return;
+    stop(); audio.src = g.audio; audio.currentTime = 0;
+    audio.play().catch(() => {});
+    timer = setInterval(() => {
+      if (!audio.duration) return;
+      const p = audio.currentTime / audio.duration;
+      $("bar").style.width = (p * 100).toFixed(1) + "%";
+      light(Math.min(g.steps.length - 1, Math.floor(p * g.steps.length)));
+    }, 200);
+  }
+  audio.onended = () => { clearInterval(timer); timer = null; $("bar").style.width = "100%";
+    document.querySelectorAll(".step").forEach(s => { s.classList.add("on"); s.classList.remove("cur"); }); };
+  $("play").onclick = play; $("stop").onclick = stop;
+  $("prev").onclick = () => show(idx - 1, true); $("next").onclick = () => show(idx + 1, true);
+
+  fetch("lessons.json").then(r => r.json()).then(d => {
+    lessons = d.lessons; $("ver").textContent = "v" + d.version;
+    $("toc").innerHTML = lessons.map((g, i) => `<button type="button"><span class="n">${i + 1}</span><span>${g.title}</span></button>`).join("");
+    document.querySelectorAll("#toc button").forEach((b, i) => b.onclick = () => show(i));
+    const k = lessons.findIndex(g => g.key === (location.hash.slice(1) || "intro"));
+    show(k < 0 ? 0 : k);
+  }).catch(() => { $("vtext").textContent = "教學資料載入失敗，請重新整理。"; });
+})();
+</script>
+</body>
+</html>

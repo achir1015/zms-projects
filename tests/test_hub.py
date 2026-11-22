@@ -144,3 +144,29 @@ def test_video_media():
     assert "https://example.com/files/REC_20261112_63.mp4" in v
     assert "https://github.com/user-attachments/assets/5b4cd40d-3b73" in v
     assert "https://github.com/user-attachments/assets/img-1" not in v
+
+
+def test_public_snapshot(biz):
+    _add(biz, "pub", title="公開專案")
+    _add(biz, "secret", title="私人專案")
+    biz.db.exec("UPDATE prj_project SET is_private=1 WHERE name='secret'")
+    biz.db.exec("UPDATE prj_project SET readme=%s WHERE name='pub'",
+                ("# 公開 主題\nhttps://github.com/user-attachments/assets/abc-123\n",))
+    biz.save_note("pub", memo="內部備忘", play_url="https://play.google.com/store/apps/details?id=x")
+    biz.set_platform("pub", "WIN", 4, "1.1.0")
+    biz.save_task(None, "pub", "內部待辦", "MAC", 1, None, "admin")
+    data, readmes = biz.public_snapshot()
+    names = [p["name"] for p in data["projects"]]
+    assert "pub" in names and "secret" not in names
+    p = next(x for x in data["projects"] if x["name"] == "pub")
+    assert p["play"] and p["platforms"]["WIN"] == {"status": 4, "version": "1.1.0"}
+    assert p["videos"] == ["https://github.com/user-attachments/assets/abc-123"]
+    text = json.dumps(data, ensure_ascii=False)
+    assert "內部備忘" not in text and "內部待辦" not in text and "secret" not in readmes
+    assert readmes["pub"].startswith("# 公開")
+    with pytest.raises(BizError):
+        biz.publish_online("")          # 沒有設定線上版儲存庫
+    biz.save_company(pages_repo="https://github.com/achir1015/zms-projects")
+    assert biz.company()["pages_repo"] == "achir1015/zms-projects"
+    with pytest.raises(BizError):
+        biz.save_company(pages_repo="不合法")

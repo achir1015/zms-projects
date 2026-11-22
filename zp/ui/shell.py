@@ -12,6 +12,7 @@ from ..database import DB, explain_error
 from ..dbserver import LocalDatabaseServer
 from ..help_text import BY_KEY, page_voice_key, text_for
 from ..settings import Settings, data_dir
+from .. import webserve
 from ..voice import speaker
 from . import theme as T
 
@@ -72,6 +73,7 @@ class App:
         self.api = None              # 電腦版：手機連線服務
         self.client = None           # 手機版：連到電腦的用戶端
         self.server_info = None
+        self.web = None              # 電腦版：公司內的線上版網頁服務
 
     # ================================================================ 啟動
     def start(self):
@@ -132,7 +134,8 @@ class App:
                     pass
             self.db = DB(self.st)
             self.db.prepare()
-            self.st.save()
+            if not webserve.is_child():
+                self.st.save()
             self.books = Biz(self.db)
             self.reports = self.books
             self.ctx = T.Ctx(self)
@@ -149,7 +152,15 @@ class App:
     def login(self):
         p = self.page
         first = not self.books.has_users()
-        uid = T.field("帳號", self.st.last_user or ("admin" if first else ""), width=320,
+        web = self.ctx.web
+        if first and web:                             # 線上版不能建立第一個管理員（要在這台電腦上建立）
+            p.controls.clear()
+            p.add(ft.Container(T.empty_state(ft.Icons.LOCK_PERSON, "尚未建立系統管理員",
+                                             "請先在執行專案彙整的電腦上建立管理員帳號，再用瀏覽器登入。"),
+                               expand=True, alignment=ft.Alignment.CENTER, bgcolor=T.BG))
+            p.update()
+            return
+        uid = T.field("帳號", "" if web else (self.st.last_user or ("admin" if first else "")), width=320,
                       prefix_icon=ft.Icons.PERSON_OUTLINE)
         name = T.field("您的姓名", "系統管理員", width=320, visible=first, prefix_icon=ft.Icons.BADGE_OUTLINED)
         pw = T.field("密碼", "", width=320, password=True, can_reveal_password=True, prefix_icon=ft.Icons.LOCK_OUTLINE,
@@ -168,8 +179,9 @@ class App:
                 msg.value = str(ex)
                 p.update()
                 return
-            self.st.last_user = self.books.uid
-            self.st.save()
+            if not web:
+                self.st.last_user = self.books.uid
+                self.st.save()
             self.main()
 
         pw.on_submit = go
@@ -219,10 +231,11 @@ class App:
             ft.FilledButton("建立並登入" if first else "登入", icon=ft.Icons.LOGIN, width=320, height=48,
                             on_click=go, bgcolor=T.PRIMARY,
                             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=12))),
-            ft.Row([T.btn("資料庫設定", ft.Icons.STORAGE, lambda e: self.db_settings(), kind="ghost"),
-                    T.btn("聽說明", ft.Icons.VOLUME_UP, lambda e: speaker.say_help("intro", BY_KEY["intro"]["voice"]),
+            ft.Row(([] if web else [T.btn("資料庫設定", ft.Icons.STORAGE, lambda e: self.db_settings(), kind="ghost")]) + [
+                    T.btn("聽說明", ft.Icons.VOLUME_UP, lambda e: self.ctx.say_help("intro", BY_KEY["intro"]["voice"]),
                           kind="ghost")], alignment=ft.MainAxisAlignment.CENTER, width=320),
-            T.muted("資料庫：%s" % ("本機內建（自動啟動）" if self.st.mode == "embedded" else
+            T.muted("線上版：資料在執行專案彙整的電腦上" if web else
+                    "資料庫：%s" % ("本機內建（自動啟動）" if self.st.mode == "embedded" else
                                   "%s:%s" % (self.st.host, self.st.port)), 11)],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=12, tight=True)
         p.controls.clear()
@@ -239,7 +252,7 @@ class App:
 
     def main(self):
         p = self.page
-        hide = set()
+        hide = {"backup", "update"} if self.ctx.web else set()      # 線上版：備份還原、更新只在這台電腦操作
         self.groups = [(g, ic, tone, [it for it in items if self.allowed(it[3], it[4]) and it[0] not in hide])
                        for g, ic, tone, items in menu()]
         self.groups = [g for g in self.groups if g[3]]
@@ -285,9 +298,38 @@ class App:
         layout = ft.Row([side, ft.Column([top, self.body], expand=True, spacing=0)], expand=True, spacing=0)
         p.add(ft.SafeArea(layout, expand=True) if self.mobile else layout)
         self.go("home")
+        if self.ctx.web:
+            return
         threading.Thread(target=self._check_update, daemon=True).start()
         if self.books.settings_row().get("auto_sync") and self.books.can("SYNC", 2):
             threading.Thread(target=self._auto_sync, daemon=True).start()
+        if self.st.extra.get("web_enabled") and not self.web:
+            threading.Thread(target=self._start_web_quiet, daemon=True).start()
+
+    # ================================================================ 公司內的線上版（網頁服務）
+    def start_web(self):
+        from .. import webserve
+        if self.web and self.web.running:
+            return self.web
+        self.web = webserve.WebService(int(self.st.extra.get("web_port") or webserve.DEFAULT_PORT))
+        try:
+            self.web.start()
+        except Exception:
+            self.web = None
+            raise
+        return self.web
+
+    def _start_web_quiet(self):
+        try:
+            self.start_web()
+        except Exception as e:
+            log.exception("web start")
+            self.ctx.toast("線上版服務無法啟動：%s" % e, True)
+
+    def stop_web(self):
+        if self.web:
+            self.web.stop()
+            self.web = None
 
     def _auto_sync(self):
         """開程式時自動彙整 GitHub（背景執行，完成後提示）。"""
@@ -355,7 +397,7 @@ class App:
             self.ctx.toast("您沒有使用此功能的權限", True)
             return
         g, tone, it = found
-        speaker.stop()
+        self.ctx.stop_voice()
         self.current = sid
         self.expanded.add(g)
         self.crumb.controls = [T.icon_tile(it[2], tone, 32, radius=9), T.muted(g, 14),
@@ -371,11 +413,11 @@ class App:
         self.page.update()
 
     def speak_page(self):
-        if speaker.playing():
-            speaker.stop()
+        if self.ctx.voice_playing():
+            self.ctx.stop_voice()
             return
         title, text = text_for(self.current)
-        speaker.say_help(page_voice_key(self.current), text)
+        self.ctx.say_help(page_voice_key(self.current), text)
         self.ctx.toast("🔊 正在播放：%s" % title)
 
     # ================================================================ 版本更新提示
@@ -419,7 +461,7 @@ class App:
                  icon=ft.Icons.KEY, width=380)
 
     def logout(self):
-        speaker.stop()
+        self.ctx.stop_voice()
         self.books.logout()
         self.current = "home"
         self.login()
@@ -486,6 +528,7 @@ class App:
 
     def shutdown(self):
         speaker.stop()
+        self.stop_web()
         try:
             if self.books and self.books.user:
                 self.books.logout()

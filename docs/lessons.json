@@ -1,0 +1,185 @@
+{
+ "app": "資料助秘專案彙整",
+ "version": "1.1.0",
+ "repo": "achir1015/zms-projects",
+ "lessons": [
+  {
+   "key": "intro",
+   "title": "認識專案彙整",
+   "voice": "歡迎使用資料助秘專案彙整。這套系統把你在 GitHub 上的所有專案集中在一個地方管理。按一下彙整 GitHub，系統會抓回專案清單、每個專案的 README 和最新發佈版本，README 第一行的大標題就是專案主題，會顯示在卡片最上面。專案可以放進自訂的分類頁簽，例如小柯機器人、資料助秘、遊戲；平台進度總表一眼看出每個專案在 Windows、Mac、線上版、iPhone、iPad 和 Android 做到哪裡；還有待辦事項，記下每個專案接下來要做的事。所有資料存在 MariaDB 資料庫，依使用者權限控制能看和能改的範圍。",
+   "audio": "voice/intro.mp3",
+   "steps": [
+    {
+     "icon": "sync",
+     "tone": "teal",
+     "text": "彙整 GitHub 的所有專案"
+    },
+    {
+     "icon": "apps",
+     "tone": "blue",
+     "text": "專案卡片：主題、版本、連結"
+    },
+    {
+     "icon": "folder_special",
+     "tone": "amber",
+     "text": "分類頁簽整理專案"
+    },
+    {
+     "icon": "grid_view",
+     "tone": "violet",
+     "text": "六平台進度總表"
+    },
+    {
+     "icon": "checklist",
+     "tone": "rose",
+     "text": "待辦事項追蹤"
+    }
+   ]
+  },
+  {
+   "key": "first",
+   "title": "第一次使用：設定與匯入",
+   "voice": "第一次使用，請先到彙整 GitHub 頁面的 GitHub 設定，填入 GitHub 帳號名稱，注意是帳號不是電子郵件。Token 可以不填，但沒有 Token 時 GitHub 每小時只允許六十次查詢，專案多的時候部分發佈版本會改用比較慢的方式查詢；填了 Token 每小時可以查五千次，也看得到私人專案。如果你原本用過專案彙整網頁，可以按匯入舊版彙整網頁，選擇那個 HTML 檔，專案和 README 會一次匯進來；舊網頁匯出的備份檔也可以用匯入備份帶入分類和便利貼。接著到分類管理按依規則自動分類，系統會依專案名稱把專案放進對應分類。最後在使用者與權限建立同仁的帳號，選擇專案主管、開發人員、測試人員或查詢人員等角色範本。",
+   "audio": "voice/first.mp3",
+   "steps": [
+    {
+     "icon": "settings",
+     "tone": "blue",
+     "text": "填 GitHub 帳號與 Token"
+    },
+    {
+     "icon": "html",
+     "tone": "orange",
+     "text": "匯入舊版彙整網頁"
+    },
+    {
+     "icon": "auto_fix_high",
+     "tone": "amber",
+     "text": "依規則自動分類"
+    },
+    {
+     "icon": "admin_panel_settings",
+     "tone": "pink",
+     "text": "建立同仁帳號與權限"
+    }
+   ]
+  },
+  {
+   "key": "sync",
+   "title": "彙整 GitHub",
+   "voice": "按立即彙整 GitHub，系統分三個步驟。第一步讀取專案清單，包括說明、星星數、語言和最後更新時間。第二步讀取 README，只有更新過的專案才會重新讀，README 的大標題會變成專案主題，裡面的 App Store、Play 商店、影片和下載網址也會自動偵測出來，README 裡有 mp4 影片就算播放媒體，可以直接按播放。第三步查詢每個專案最新的發佈版本和下載檔案。如果發佈檔有 exe 安裝檔、Mac 的 dmg、Android 的 apk 或 iPhone 的 ipa，平台進度會自動標成已發佈。彙整不會覆蓋你手動填的便利貼、分類和平台備註。也可以打開開程式時自動彙整。",
+   "audio": "voice/sync.mp3",
+   "steps": [
+    {
+     "icon": "list",
+     "tone": "teal",
+     "text": "① 專案清單"
+    },
+    {
+     "icon": "article",
+     "tone": "blue",
+     "text": "② README 與主題"
+    },
+    {
+     "icon": "new_releases",
+     "tone": "green",
+     "text": "③ 最新發佈版本"
+    },
+    {
+     "icon": "devices",
+     "tone": "violet",
+     "text": "依發佈檔標示平台"
+    }
+   ]
+  },
+  {
+   "key": "browse",
+   "title": "瀏覽專案與便利貼",
+   "voice": "專案總覽上方可以搜尋主題、名稱、說明或備忘，排序可選最近更新、最近發佈、星星數或名稱，也可以只看有 Apple、Play、影片、下載或線上版的專案。下面一排是分類頁簽，數字是專案數量。每張卡片最上面是專案主題，下面是專案名稱、版本、說明，五個小圖示代表各種連結，亮起來就是有，按一下直接開啟；右邊六個小圖示是平台進度，綠色代表已發佈。按卡片會在右邊打開明細，有總覽、README、下載版本、平台進度、便利貼和待辦六個頁籤。README 裡的影片會列在最上面，按播放就能觀看。便利貼可以手動填專案主題、狀態、負責人、App Store 和 Play 網址、審核備註和備忘，彙整時不會被覆蓋。",
+   "audio": "voice/browse.mp3",
+   "steps": [
+    {
+     "icon": "search",
+     "tone": "blue",
+     "text": "搜尋、排序、篩選"
+    },
+    {
+     "icon": "tab",
+     "tone": "amber",
+     "text": "分類頁簽"
+    },
+    {
+     "icon": "article",
+     "tone": "teal",
+     "text": "明細：總覽、README"
+    },
+    {
+     "icon": "ondemand_video",
+     "tone": "rose",
+     "text": "影片直接播放"
+    },
+    {
+     "icon": "sticky_note_2",
+     "tone": "orange",
+     "text": "便利貼補充資料"
+    }
+   ]
+  },
+  {
+   "key": "platforms",
+   "title": "平台進度與待辦",
+   "voice": "平台進度總表把每個專案在六個平台的狀態排成一張表：未定、規劃中、開發中、測試中、已發佈和不適用，用不同顏色顯示。按任何一格就能修改狀態、版本和備註，例如 iPhone 版填上 App Store 審核中。上方可以依分類篩選，也能匯出 Excel。待辦事項可以指定專案、平台、優先順序、預定完成日和負責人，過期沒完成的日期會用紅字提醒，完成時勾選就好；打開只看我的，只列出自己負責的事項。",
+   "audio": "voice/platforms.mp3",
+   "steps": [
+    {
+     "icon": "grid_view",
+     "tone": "violet",
+     "text": "平台進度總表"
+    },
+    {
+     "icon": "edit",
+     "tone": "amber",
+     "text": "點格子修改狀態與版本"
+    },
+    {
+     "icon": "add_task",
+     "tone": "rose",
+     "text": "新增待辦"
+    },
+    {
+     "icon": "task_alt",
+     "tone": "green",
+     "text": "勾選完成"
+    }
+   ]
+  },
+  {
+   "key": "admin",
+   "title": "權限、備份與更新",
+   "voice": "系統管理員可以在使用者與權限新增同仁，權限分成專案資料、平台進度、待辦事項、分類管理、彙整 GitHub、統計報表和系統管理七項，每一項可以設定無、查詢或維護。GitHub Token 只有系統管理權限看得到。建議每週到備份與還原備份一次，存到隨身碟或雲端硬碟。程式開啟時會自動檢查新版本，右上角出現有新版本時，按一下就能下載並自動安裝；桌面捷徑不見了也可以在這裡重建。操作紀錄會記下登入、彙整、便利貼修改前後的內容、分類和待辦的異動。",
+   "audio": "voice/admin.mp3",
+   "steps": [
+    {
+     "icon": "admin_panel_settings",
+     "tone": "pink",
+     "text": "使用者與權限"
+    },
+    {
+     "icon": "backup",
+     "tone": "teal",
+     "text": "備份與還原"
+    },
+    {
+     "icon": "system_update",
+     "tone": "blue",
+     "text": "版本更新與捷徑"
+    },
+    {
+     "icon": "history",
+     "tone": "slate",
+     "text": "操作紀錄"
+    }
+   ]
+  }
+ ]
+}

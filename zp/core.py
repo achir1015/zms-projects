@@ -3,6 +3,7 @@
 所有規則都在服務層檢查（畫面只負責顯示），日後手機版透過 API 也共用同一套。
 """
 import json
+import re
 
 from . import passwords
 from .seed import FUNC_NAMES, FUNCS, LEVEL_NAMES, ROLES
@@ -168,7 +169,8 @@ class Base:
         """內部使用（彙整時），不經過權限遮蔽。"""
         return self.db.value("SELECT github_token FROM sys_company WHERE id=1") or ""
 
-    def save_company(self, name=None, github_owner=None, github_token=None, include_forks=None, auto_sync=None):
+    def save_company(self, name=None, github_owner=None, github_token=None, include_forks=None, auto_sync=None,
+                     pages_repo=None):
         self.need("SYS")
         vals = {}
         if name is not None:
@@ -184,6 +186,12 @@ class Base:
             vals["include_forks"] = int(bool(include_forks))
         if auto_sync is not None:
             vals["auto_sync"] = int(bool(auto_sync))
+        if pages_repo is not None:
+            pr = (pages_repo or "").strip().strip("/")
+            pr = re.sub(r"^https?://github\.com/", "", pr, flags=re.I)
+            if pr and not re.match(r"^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$", pr):
+                raise BizError("線上版儲存庫請填「帳號/儲存庫」，例如 achir1015/zms-projects")
+            vals["pages_repo"] = pr
         if vals:
             self.db.exec("UPDATE sys_company SET %s WHERE id=1" % ", ".join("%s=%%s" % k for k in vals),
                          tuple(vals.values()))

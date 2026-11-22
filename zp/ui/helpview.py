@@ -7,7 +7,7 @@ import flet as ft
 
 from .. import APP_NAME, APP_VERSION
 from ..help_text import BY_KEY, LESSONS
-from ..voice import help_mp3, speaker
+from ..voice import help_mp3
 from . import theme as T
 
 I = ft.Icons
@@ -29,7 +29,7 @@ class Help(ft.Row):
 
     def show(self, key, update=True, autoplay=False):
         self.token += 1
-        speaker.stop()
+        self.ctx.stop_voice()
         self.sec = key
         g = BY_KEY[key]
         self.toc.controls = [ft.Container(ft.Row([
@@ -95,7 +95,7 @@ class Help(ft.Row):
         g = BY_KEY[self.sec]
         self.token += 1
         token = self.token
-        speaker.say_help(self.sec, g["voice"])
+        self.ctx.say_help(self.sec, g["voice"])
         mp3 = help_mp3(self.sec)
         total = os.path.getsize(mp3) * 8 / 48000 if mp3 else max(len(g["voice"]) / 4.2, 3)
         per = total / len(self.tiles)
@@ -122,7 +122,7 @@ class Help(ft.Row):
 
     def stop(self, refresh=True):
         self.token += 1
-        speaker.stop()
+        self.ctx.stop_voice()
         self._light(-1)
         if refresh:
             self.update()

@@ -165,6 +165,46 @@ class Gateway:
                 return ""
         return ""
 
+    # ------------------------------------------------------------ 寫入（發佈線上版）
+    def _send(self, method, path, body=None):
+        if not self.token:
+            raise RuntimeError("要先在「GitHub 設定」填入 Token（需有該儲存庫的 Contents 寫入權限）")
+        data = json.dumps(body).encode("utf-8") if body is not None else None
+        req = urllib.request.Request(API + path, data=data, method=method, headers={
+            "User-Agent": UA, "Authorization": "Bearer " + self.token, "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=120, context=self.ssl) as r:
+                self._note_rate(r.headers)
+                return json.loads(r.read() or b"{}")
+        except urllib.error.HTTPError as e:
+            self._note_rate(e.headers)
+            try:
+                msg = json.loads(e.read() or b"{}").get("message") or ""
+            except Exception:
+                msg = ""
+            if e.code in (401, 403):
+                raise RuntimeError("GitHub 拒絕寫入（%s）：請確認 Token 有這個儲存庫的 Contents 寫入權限" % (msg or e.code))
+            if e.code == 404:
+                raise RuntimeError("找不到儲存庫或分支（%s），或 Token 沒有權限" % path.split("/git/")[0])
+            raise RuntimeError("GitHub 回應 %s：%s" % (e.code, msg))
+
+    def commit_files(self, repo, files, message, branch=""):
+        """把多個文字檔一次 commit 到儲存庫（Git Data API，共 5 次呼叫）。files：{路徑: 文字內容}。"""
+        if not branch:
+            branch = (self._send("GET", "/repos/%s" % repo) or {}).get("default_branch") or "main"
+        ref = self._send("GET", "/repos/%s/git/ref/heads/%s" % (repo, branch))
+        head = ref["object"]["sha"]
+        base = self._send("GET", "/repos/%s/git/commits/%s" % (repo, head))["tree"]["sha"]
+        tree = self._send("POST", "/repos/%s/git/trees" % repo, {"base_tree": base, "tree": [
+            {"path": k, "mode": "100644", "type": "blob", "content": v} for k, v in files.items()]})
+        if tree["sha"] == base:
+            return head                          # 內容沒變
+        c = self._send("POST", "/repos/%s/git/commits" % repo, {"message": message, "tree": tree["sha"],
+                                                                "parents": [head]})
+        self._send("PATCH", "/repos/%s/git/refs/heads/%s" % (repo, branch), {"sha": c["sha"]})
+        return c["sha"]
+
 
 def slim(data):
     """只留下需要的欄位，避免快取太大。"""

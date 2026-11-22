@@ -671,6 +671,74 @@ class HubMixin:
         self.log("import_backup", "", json.dumps(stat, ensure_ascii=False))
         return stat
 
+    # ================================================================ 線上版（GitHub Pages）
+    def public_snapshot(self):
+        """給線上版的公開資料：只含公開專案；不含便利貼備註、待辦、負責人等內部資料。
+        回傳 (projects 資料, {專案名稱: README})。"""
+        self.need("PRJ", 1)
+        st = self.settings_row()
+        ps = [p for p in self.all_projects() if not p.get("is_private")]
+        names = [p["name"] for p in ps]
+        readmes = {}
+        if names:
+            for r in self.db.rows("SELECT name, readme FROM prj_project WHERE name IN (%s)"
+                                  % ", ".join(["%s"] * len(names)), tuple(names)):
+                if r["readme"]:
+                    readmes[r["name"]] = r["readme"]
+        used = {c["id"] for p in ps for c in p["cats"]}
+
+        def iso(v):
+            return v.isoformat(timespec="minutes") if isinstance(v, dt.datetime) else (str(v) if v else "")
+        out = []
+        for p in ps:
+            note = p["note"] or {}
+            vids = list(dict.fromkeys(([note["video_url"]] if note.get("video_url") else []) + p["detected"]["video"]))
+            out.append(dict(
+                name=p["name"], full_name=p.get("full_name") or "", url=p.get("url") or "", title=p["display"],
+                heading=p.get("heading") or "", description=p.get("description") or "", stars=p.get("stars") or 0,
+                forks=p.get("forks") or 0, language=p.get("language") or "",
+                topics=[t for t in (p.get("topics") or "").split(",") if t], homepage=p.get("homepage") or "",
+                pushed=iso(p.get("pushed_at")), fork=bool(p.get("is_fork")), archived=bool(p.get("archived")),
+                status=p.get("status") or "", rel=dict(tag=p.get("rel_tag") or "", url=p.get("rel_url") or "",
+                                                       published=iso(p.get("rel_published")),
+                                                       assets=[dict(name=a.get("name") or "", url=a.get("url") or "",
+                                                                    size=a.get("size") or 0)
+                                                               for a in p["assets"]]),
+                apple=p["apple"], play=p["play"], live=p["live"], videos=vids, download=p["download"],
+                cats=[c["id"] for c in p["cats"]],
+                platforms={k: dict(status=v.get("status") or 0, version=v.get("version") or "")
+                           for k, v in p["platforms"].items() if v.get("status")},
+                has_readme=p["name"] in readmes))
+        data = dict(app="資料助秘專案彙整", schema=1, owner=st.get("github_owner") or "",
+                    team=(st.get("name") or ""), generated=dt.datetime.now().isoformat(timespec="seconds"),
+                    categories=[dict(id=c["id"], name=c["name"], color=c["color"]) for c in self.categories()
+                                if c["id"] in used],
+                    platforms=[dict(code=c, name=n) for c, n, *_ in PLATFORMS],
+                    status_names={str(k): v[0] for k, v in PLT_STATUS.items()}, projects=out)
+        return data, readmes
+
+    def publish_online(self, repo=""):
+        """把公開資料 commit 到線上版儲存庫的 docs/data/（GitHub Pages 會自動更新，約 1 分鐘）。"""
+        self.need("SYNC", 2)
+        st = self.settings_row()
+        repo = (repo or st.get("pages_repo") or "").strip()
+        if not repo:
+            raise BizError("請先在「GitHub 設定」填寫線上版儲存庫（例如 achir1015/zms-projects）")
+        data, readmes = self.public_snapshot()
+        gw = Gateway(self.db, self.github_token())
+        files = {"docs/data/projects.json": json.dumps(data, ensure_ascii=False, separators=(",", ":")),
+                 "docs/data/readmes.json": json.dumps(readmes, ensure_ascii=False, separators=(",", ":"))}
+        try:
+            sha = gw.commit_files(repo, files, "線上版資料更新：%d 個專案" % len(data["projects"]))
+        except RuntimeError as e:
+            raise BizError(str(e))
+        except OSError as e:
+            raise BizError("連不到 GitHub，請確認網路：%s" % e)
+        self.db.exec("UPDATE sys_company SET pages_at=NOW() WHERE id=1")
+        self.log("publish", repo, "%d 個專案 %s" % (len(data["projects"]), sha[:7]))
+        owner, _, name = repo.partition("/")
+        return dict(count=len(data["projects"]), sha=sha, url="https://%s.github.io/%s/" % (owner.lower(), name))
+
     # ================================================================ 首頁與統計
     def dashboard(self):
         ps = self.all_projects()

@@ -1,10 +1,10 @@
 [project]
 name = "zms-projects"
-version = "1.0.0"
+version = "1.1.0"
 description = "資料助秘專案彙整"
 authors = [{ name = "吳玉柱" }]
 requires-python = ">=3.10"
-dependencies = ["flet==1.1.2", "flet-audio==1.1.2", "pymysql>=1.1"]
+dependencies = ["flet==1.1.2", "flet-audio==1.1.2", "pymysql>=1.1", "qrcode>=7", "pillow"]
 
 [tool.flet]
 org = "com.achir"

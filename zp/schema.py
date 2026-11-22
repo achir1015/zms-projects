@@ -17,7 +17,9 @@ TABLES = [
         ("include_forks", "TINYINT NOT NULL DEFAULT 1", "顯示 Fork 來的專案"),
         ("auto_sync", "TINYINT NOT NULL DEFAULT 0", "開程式時自動彙整"),
         ("last_sync_at", "DATETIME NULL", "上次彙整時間"),
-        ("last_sync_note", "VARCHAR(255) NOT NULL DEFAULT ''", "上次彙整結果")], []),
+        ("last_sync_note", "VARCHAR(255) NOT NULL DEFAULT ''", "上次彙整結果"),
+        ("pages_repo", "VARCHAR(160) NOT NULL DEFAULT ''", "線上版儲存庫 owner/repo（GitHub Pages 讀 docs/data）"),
+        ("pages_at", "DATETIME NULL", "上次發佈線上版時間")], []),
     ("sys_user", "使用者", [
         ("uid", "VARCHAR(30) NOT NULL PRIMARY KEY", "帳號"),
         ("name", "VARCHAR(60) NOT NULL", "姓名"),
