@@ -11,8 +11,8 @@ build-mac/
 build-win.log
 build/
 cloudflared/
-data/
-data_mobile/
+/data/
+/data_mobile/
 dist-android/
 dist-installer/
 dist-ios/
@@ -26,3 +26,4 @@ web.log
 
 .claude/
 docs/*.png
+!docs/icon.png
