@@ -170,7 +170,7 @@ class Projects(ft.Row):
                     ft.Text("★ %d" % p["stars"], size=12, color="#D97706"),
                     *([T.chip(p["rel_tag"], "green", size=10)] if p.get("rel_tag") else [])], spacing=4),
             ft.Text(p.get("description") or "（沒有說明）", size=12, color="#475569", max_lines=2,
-                    overflow=ft.TextOverflow.ELLIPSIS, height=34),
+                    overflow=ft.TextOverflow.ELLIPSIS, height=None if T.MOBILE else 34),
             ft.Row([ft.Row(icons, spacing=4, tight=True), plat_dots(p)], wrap=True, run_spacing=6,
                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Row([T.color_chip(c["name"], c["color"], 10) for c in p["cats"][:4]] +
