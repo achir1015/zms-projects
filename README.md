@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/e6c93ffa-3455-43ab-93ed-f8085f004e47
 | 線上版（公開） | https://achir1015.github.io/zms-projects/app/ — 不用安裝，瀏覽器看所有公開專案；資料由桌面版「發佈線上版」更新 |
 | 線上版（公司內） | 桌面版「版本更新與捷徑」打開「公司內的線上版」，同一個網路的電腦、平板用瀏覽器登入，資料與權限和桌面版相同 |
 | iPhone／iPad | Safari 開 https://achir1015.github.io/zms-projects/ios/ 安裝（內部測試版，限已登記裝置）；電腦版打開「手機 App 連線」後用相機掃 QR Code 連線 |
-| Android | 陸續推出 |
+| Android 7.0 以上 | 到 [Releases](https://github.com/achir1015/zms-projects/releases/latest) 下載 `ZMSProjects-<版本>-android.apk` 安裝；連線方式同 iPhone |
 
 ## 開發
 
