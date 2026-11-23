@@ -23,7 +23,7 @@
       <key>metadata</key>
       <dict>
         <key>bundle-identifier</key><string>com.achir.zmsprojects</string>
-        <key>bundle-version</key><string>1.2.0</string>
+        <key>bundle-version</key><string>1.3.0</string>
         <key>kind</key><string>software</string>
         <key>title</key><string>資料助秘專案彙整</string>
       </dict>

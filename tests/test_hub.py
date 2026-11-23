@@ -170,3 +170,34 @@ def test_public_snapshot(biz):
     assert biz.company()["pages_repo"] == "achir1015/zms-projects"
     with pytest.raises(BizError):
         biz.save_company(pages_repo="不合法")
+
+
+def test_rank_icons_and_manual_icon(biz):
+    import base64
+    import io
+
+    from PIL import Image
+
+    from zp.github import make_thumb, rank_icons
+    paths = ["README.md", "node_modules/x/icon.png", "docs/screens/home.png", "platform/icon_16.png",
+             "platform/icon_256.png", "assets/icon_1024.png", "icons/icon-maskable-512.png", "icons/icon-512.png",
+             "res/mipmap-mdpi/ic_launcher.png", "res/mipmap-xxxhdpi/ic_launcher.png"]
+    r = rank_icons(paths)
+    assert "node_modules/x/icon.png" not in r and "docs/screens/home.png" not in r
+    assert r[0] in ("assets/icon_1024.png", "icons/icon-512.png")
+    assert r.index("res/mipmap-xxxhdpi/ic_launcher.png") < r.index("res/mipmap-mdpi/ic_launcher.png")
+    assert r.index("icons/icon-512.png") < r.index("icons/icon-maskable-512.png")
+    buf = io.BytesIO()
+    Image.new("RGBA", (300, 200), (200, 30, 30, 255)).save(buf, "PNG")
+    thumb = make_thumb(buf.getvalue())
+    assert Image.open(io.BytesIO(thumb)).size == (96, 96)
+    biz.add_project("demo", "示範")
+    biz.set_icon("demo", base64.b64encode(buf.getvalue()).decode())
+    p = biz.project("demo")
+    assert p["icon_path"] == "manual:" and p["icon_png"]
+    with pytest.raises(BizError):
+        biz.set_icon("demo", base64.b64encode(b"not an image").decode())
+    data, _ = biz.public_snapshot()
+    assert data["projects"][0]["icon"].startswith("data:image/png;base64,")
+    biz.clear_icon("demo")
+    assert not biz.project("demo")["icon_png"]

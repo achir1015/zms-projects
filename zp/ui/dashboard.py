@@ -6,7 +6,7 @@ import flet as ft
 from .. import rocdate
 from ..seed import PLATFORMS
 from . import theme as T
-from .projects import plat_dots, when
+from .projects import plat_dots, project_icon, when
 
 I = ft.Icons
 
@@ -63,6 +63,7 @@ class Dashboard(ft.Column):
         recent = T.card(ft.Column([
             ft.Row([T.icon_tile(I.HISTORY, "teal", 34), ft.Text("最近更新的專案", size=16, weight=ft.FontWeight.W_700)]),
             ft.Column([ft.Container(ft.Row([
+                project_icon(p, 34),
                 ft.Column([ft.Text(p["display"], size=14, weight=ft.FontWeight.W_600, max_lines=1,
                                    overflow=ft.TextOverflow.ELLIPSIS),
                            T.muted("%s · %s" % (p["name"], when(p.get("pushed_at"))), 11)], spacing=0, expand=True),

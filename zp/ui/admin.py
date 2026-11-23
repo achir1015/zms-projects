@@ -454,7 +454,7 @@ ACTIONS = {"login": "登入", "logout": "登出", "login_fail": "登入失敗", 
            "cat_save": "修改分類", "cat_delete": "刪除分類", "auto_classify": "自動分類", "task_save": "儲存待辦",
            "task_done": "完成待辦", "task_undo": "取消完成", "task_delete": "刪除待辦", "import_html": "匯入網頁",
            "import_backup": "匯入備份", "export_backup": "匯出備份",
-           "web": "線上版服務", "publish": "發佈線上版", "api": "手機連線服務", "mobile_login": "手機登入"}
+           "web": "線上版服務", "publish": "發佈線上版", "api": "手機連線服務", "mobile_login": "手機登入", "icon": "專案圖示"}
 
 
 class Audit(ft.Column):

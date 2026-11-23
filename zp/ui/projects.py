@@ -15,6 +15,36 @@ STATUS_TONE = {s: v for s, v in PLT_STATUS.items()}
 PLAT_COLOR = {"slate": "#CBD5E1", "sky": "#38BDF8", "amber": "#F59E0B", "violet": "#8B5CF6", "green": "#16A34A"}
 
 
+_ICON_CACHE = {}
+_TILE_TONES = ["blue", "teal", "amber", "violet", "green", "rose", "sky", "orange"]
+
+
+def project_icon(p, size=40):
+    """專案的小圖示：有圖示檔用圖示，沒有就用主題第一個字的色塊。"""
+    b64 = p.get("icon_png")
+    if b64:
+        data = _ICON_CACHE.get(b64)
+        if data is None:
+            import base64
+            try:
+                data = _ICON_CACHE[b64] = base64.b64decode(b64)
+            except Exception:
+                data = b""
+        if data:
+            return ft.Container(ft.Image(src=data, width=size, height=size, fit=ft.BoxFit.CONTAIN),
+                                width=size, height=size, border_radius=size * 0.22,
+                                clip_behavior=ft.ClipBehavior.ANTI_ALIAS)
+    bg, fg = T.TONES[_TILE_TONES[sum(map(ord, p.get("name") or "")) % len(_TILE_TONES)]]
+    sym = getattr(I, (p.get("symbol") or "").upper(), None)
+    if sym:
+        return ft.Container(ft.Icon(sym, size=size * 0.6, color=fg), width=size, height=size,
+                            border_radius=size * 0.22, bgcolor=bg, alignment=ft.Alignment.CENTER)
+    title = (p.get("display") or p.get("name") or "?").lstrip("#*-_ ·🤖")
+    ch = next((c for c in title if c.isalnum()), "?").upper()
+    return ft.Container(ft.Text(ch, size=size * 0.45, weight=ft.FontWeight.W_800, color=fg), width=size, height=size,
+                        border_radius=size * 0.22, bgcolor=bg, alignment=ft.Alignment.CENTER)
+
+
 def when(d):
     return rocdate.show(d) if d else ""
 
@@ -159,12 +189,13 @@ class Projects(ft.Row):
                                       bgcolor="#F1F5F9" if on else "#F8FAFC", tooltip=name if on else "沒有" + name,
                                       on_click=(lambda e, u=p[k]: self.ctx.open_url(u)) if on else None))
         st = PRJ_STATUS.get(p["status"])
-        top = [ft.Text(p["display"], size=16, weight=ft.FontWeight.W_800, color=T.TEXT, max_lines=2,
+        top = [project_icon(p, 40),
+               ft.Text(p["display"], size=16, weight=ft.FontWeight.W_800, color=T.TEXT, max_lines=2,
                        overflow=ft.TextOverflow.ELLIPSIS, expand=True)]
         if p["status"]:
             top.append(T.chip(st[0], st[1], size=11))
         return ft.Container(ft.Column([
-            ft.Row(top, vertical_alignment=ft.CrossAxisAlignment.START),
+            ft.Row(top, spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER),
             ft.Row([ft.Icon(I.FOLDER_OUTLINED, size=13, color=T.MUTED),
                     ft.Text(p["name"], size=12, color=T.MUTED, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
                     ft.Text("★ %d" % p["stars"], size=12, color="#D97706"),
@@ -226,7 +257,9 @@ class Projects(ft.Row):
                                                            ("已封存", p.get("archived")), ("手動新增", p.get("source") == "manual"),
                                                            ("GitHub 已找不到", p.get("gone"))) if on]
         self.detail.controls = [
-            ft.Row([ft.Column([ft.Text(p["display"], size=21, weight=ft.FontWeight.W_800, color=T.TEXT, selectable=True),
+            ft.Row([ft.Container(project_icon(p, 52), on_click=(lambda e: self.icon_dialog()) if self.can_note else None,
+                                 tooltip="更換圖示" if self.can_note else None, ink=self.can_note, border_radius=12),
+                    ft.Column([ft.Text(p["display"], size=21, weight=ft.FontWeight.W_800, color=T.TEXT, selectable=True),
                                ft.TextButton(p["name"], icon=I.LINK, on_click=lambda e: self.ctx.open_url(p["url"]),
                                              disabled=not p.get("url"), style=ft.ButtonStyle(padding=0))],
                               spacing=0, expand=True),
@@ -235,6 +268,36 @@ class Projects(ft.Row):
                    vertical_alignment=ft.CrossAxisAlignment.START),
             ft.Row([T.muted(meta, 12)] + flags, wrap=True, spacing=6),
             cat_row, bar, self.section_body()]
+
+    def icon_dialog(self):
+        c = self.ctx
+        p = self.cur
+        manual = (p.get("icon_path") or "").startswith("manual:")
+        src = "手動指定的圖示" if manual else ("自動找到：%s" % p["icon_path"]) if p.get("icon_path") else             "儲存庫裡沒有找到圖示檔，目前用文字色塊"
+
+        async def pick(e):
+            name, data = await c.pick_bytes("選擇圖示圖檔", ["png", "jpg", "jpeg", "ico", "webp"])
+            if data is None:
+                return
+            import base64
+            if c.guard(c.books.set_icon, p["name"], base64.b64encode(data).decode("ascii"), ok="圖示已更換") is not None:
+                c.close()
+                self.after_icon()
+
+        def auto(e):
+            if c.guard(c.books.clear_icon, p["name"], ok="已改回自動，下次彙整 GitHub 時重新尋找") is not None:
+                c.close()
+                self.after_icon()
+        c.dialog("專案圖示", ft.Column([ft.Row([project_icon(p, 72), T.muted(src, 13)], spacing=14),
+                                        T.muted("可選 PNG、JPG、ICO 或 WebP 圖檔，系統會縮成小圖示；手動指定後彙整不會覆蓋。", 12)],
+                                       tight=True, spacing=12),
+                 [T.btn("取消", kind="ghost", on_click=lambda e: c.close())] +
+                 ([T.btn("改回自動", I.AUTO_FIX_HIGH, auto, kind="outline")] if manual else []) +
+                 [T.btn("選擇圖檔", I.IMAGE, pick)], icon=I.IMAGE, width=460)
+
+    def after_icon(self):
+        self.all = self.ctx.books.all_projects()
+        self.show(self.cur["name"], self.section)
 
     def _has(self, t):
         p = self.cur

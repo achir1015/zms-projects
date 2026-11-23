@@ -80,7 +80,9 @@ main{padding:16px 0 40px}
 .pcard:hover{transform:translateY(-2px);border-color:var(--primary)}
 .pcard:focus-visible{outline:2px solid var(--gold)}
 .ph{display:flex;gap:12px;align-items:flex-start}
-.av{width:42px;height:42px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+.av{width:42px;height:42px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;overflow:hidden}
+.av img{width:100%;height:100%;object-fit:contain;display:block}
+.dh .av{width:48px;height:48px}
 .pt{min-width:0;flex:1}
 .pt h3{margin:0;font-size:16px;line-height:1.35;font-weight:800;overflow-wrap:anywhere}
 .pt .nm{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -277,6 +279,13 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
       return `<span class="pl s${s}" title="${esc(x.name)}：${esc(D.status_names[s] || "")}${v && v.version ? " " + esc(v.version) : ""}">${PL_SHORT[x.code] || x.code}</span>`; }).join("");
   }
 
+  function avatar(p) {
+    if (p.icon) return `<div class="av"><img src="${p.icon}" alt="" loading="lazy"></div>`;
+    const t = toneOf(p);
+    if (p.symbol) return `<div class="av" style="background:var(--t-${t});color:var(--f-${t})"><span class="ms" style="font-size:24px">${esc(p.symbol)}</span></div>`;
+    return `<div class="av" style="background:var(--t-${t});color:var(--f-${t})">${esc([...p.title.replace(/^[^\p{L}\p{N}]+/u, "") || p.name][0] || "?")}</div>`;
+  }
+
   function card(p) {
     const cats = p.cats.map(catOf).filter(Boolean);
     const tags = cats.map(c => `<span class="tag" style="background:${c.color}22;color:${c.color}"><span class="dot" style="background:${c.color};margin-right:2px"></span>${esc(c.name)}</span>`);
@@ -284,9 +293,8 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
     if (p.stars) tags.push(`<span class="tag"><span class="ms">star</span>${p.stars}</span>`);
     if (p.archived) tags.push(`<span class="tag">已封存</span>`);
     if (p.fork) tags.push(`<span class="tag">Fork</span>`);
-    const t = toneOf(p);
     return `<article class="pcard" tabindex="0" data-n="${esc(p.name)}" aria-label="${esc(p.title)}">
-      <div class="ph"><div class="av tone" style="background:var(--t-${t});color:var(--f-${t})">${esc([...p.title.replace(/^[^\p{L}\p{N}]+/u, "") || p.name][0] || "?")}</div>
+      <div class="ph">${avatar(p)}
         <div class="pt"><h3>${esc(p.title)}</h3><div class="nm">${esc(p.name)}</div></div></div>
       <p class="desc">${esc(p.description || "（沒有說明）")}</p>
       <div class="tags">${tags.join("")}</div>
@@ -351,7 +359,7 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
     const ptable = `<table class="ptable"><thead><tr><th>平台</th><th>狀態</th><th>版本</th></tr></thead><tbody>` +
       D.platforms.map(x => { const v = p.platforms[x.code] || {status: 0}; return `<tr><td>${esc(x.name)}</td><td><span class="st s${v.status}">${esc(D.status_names[v.status] || "未定")}</span></td><td>${esc(v.version || "")}</td></tr>`; }).join("") + `</tbody></table>`;
     const assets = p.rel.assets.length ? `<div class="assets">` + p.rel.assets.map(a => `<a href="${esc(a.url)}" target="_blank" rel="noopener"><b>${esc(a.name)}</b><span>${a.size ? (a.size / 1048576).toFixed(1) + " MB" : ""}</span></a>`).join("") + `</div>` : "";
-    dlg.innerHTML = `<div class="dh"><div style="flex:1;min-width:0"><h2 id="dTitle">${esc(p.title)}</h2><div class="nm">${esc(p.name)}</div></div>
+    dlg.innerHTML = `<div class="dh">${avatar(p)}<div style="flex:1;min-width:0"><h2 id="dTitle">${esc(p.title)}</h2><div class="nm">${esc(p.name)}</div></div>
         <button class="xbtn" id="dClose" aria-label="關閉"><span class="ms">close</span></button></div>
       <div class="db">
         <div class="links">${linkBtns(p, false)}</div>

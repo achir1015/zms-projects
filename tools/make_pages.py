@@ -48,8 +48,23 @@ def data(installed=False):
     from zp.dbserver import LocalDatabaseServer
     from zp.settings import Settings
     st = Settings.load()
-    srv = LocalDatabaseServer(st)
-    srv.start()                       # 已經在執行（例如安裝版開著）就直接連
+    srv = None
+    if installed:
+        # 安裝版：只連「已經在執行」的資料庫（用安裝版的密碼找埠），絕不另外啟動，免得兩個程式搶同一個資料夾
+        import pymysql
+        for port in [st.port] + list(range(3438, 3460)):
+            try:
+                pymysql.connect(host="127.0.0.1", port=port, user=st.user, password=st.password,
+                                connect_timeout=2).close()
+                st.port = port
+                break
+            except Exception:
+                continue
+        else:
+            raise SystemExit("找不到執行中的安裝版資料庫：請先打開「資料助秘專案彙整」")
+    else:
+        srv = LocalDatabaseServer(st)
+        srv.start()                   # 開發資料庫：已經在執行就直接連
     db = DB(st)
     try:
         b = Biz(db)
@@ -57,7 +72,8 @@ def data(installed=False):
         snap, readmes = b.public_snapshot()
     finally:
         db.close()
-        srv.stop()                    # 只會停掉這支工具自己開的資料庫
+        if srv:
+            srv.stop()                # 只會停掉這支工具自己開的資料庫
     d = os.path.join(DOCS, "data")
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "projects.json"), "w", encoding="utf-8") as f:

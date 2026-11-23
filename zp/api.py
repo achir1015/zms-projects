@@ -37,7 +37,7 @@ BIZ_METHODS = {
     "log", "change_password", "save_user", "delete_user", "save_company", "save_note", "add_project",
     "delete_project", "set_platform", "add_category", "save_category", "move_category", "delete_category",
     "toggle_category", "auto_classify", "save_task", "toggle_task", "delete_task", "sync_github", "import_backup",
-    "publish_online",
+    "publish_online", "set_icon", "clear_icon",
 }
 
 

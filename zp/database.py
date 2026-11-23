@@ -8,12 +8,16 @@ import pymysql.cursors
 
 from .settings import Settings
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 UPGRADES = {
     # 版本號: [SQL…]（之後的版本在這裡加欄位，舊資料庫開啟時自動升級）
     2: ["ALTER TABLE sys_company ADD COLUMN IF NOT EXISTS pages_repo VARCHAR(160) NOT NULL DEFAULT '' "
         "COMMENT '線上版儲存庫 owner/repo（GitHub Pages 讀 docs/data）'",
         "ALTER TABLE sys_company ADD COLUMN IF NOT EXISTS pages_at DATETIME NULL COMMENT '上次發佈線上版時間'"],
+    3: ["ALTER TABLE prj_project ADD COLUMN IF NOT EXISTS icon_path VARCHAR(255) NOT NULL DEFAULT '' "
+        "COMMENT '專案圖示在儲存庫裡的路徑'",
+        "ALTER TABLE prj_project ADD COLUMN IF NOT EXISTS icon_png MEDIUMTEXT COMMENT '專案小圖示（96×96 PNG，base64）'",
+        "ALTER TABLE prj_project ADD COLUMN IF NOT EXISTS icon_checked TINYINT NOT NULL DEFAULT 0 COMMENT '已找過專案圖示'"],
 }
 
 

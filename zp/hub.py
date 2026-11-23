@@ -5,6 +5,7 @@ import re
 
 from .core import BizError, normalize_owner
 from .github import Gateway, RateLimit, extract_links
+from .iconmap import symbol_for
 from .seed import PALETTE, PLATFORM_NAMES, PLATFORMS, PLT_STATUS, PRJ_STATUS
 
 NOTE_FIELDS = ("status", "owner_uid", "apple_url", "apple_note", "play_url", "play_note", "video_url",
@@ -63,6 +64,13 @@ class HubMixin:
             out.setdefault(r["name"], set()).add(r["cat_id"])
         return out
 
+    def _icon_map(self):
+        try:
+            return {r["name"]: r["icon_png"] for r in
+                    self.db.rows("SELECT name, icon_png FROM prj_project WHERE icon_png IS NOT NULL")}
+        except Exception:                      # 舊版資料庫還沒有圖示欄位
+            return {}
+
     def _platform_map(self):
         out = {}
         for r in self.db.rows("SELECT * FROM prj_platform"):
@@ -79,6 +87,9 @@ class HubMixin:
         p["note"] = note
         p["heading"] = readme_heading(p.get("readme_head") or p.get("readme") or "")
         p["display"] = short_title(p)
+        # 沒有圖示檔：依名稱、主題、說明挑一個代表圖示（Material Symbols 名稱）
+        p["symbol"] = "" if p.get("icon_png") else symbol_for(p["name"], p["display"], p.get("description") or "",
+                                                               p.get("topics") or "")
         p["apple"] = note.get("apple_url") or (det["apple"][0] if det["apple"] else "")
         p["play"] = note.get("play_url") or (det["play"][0] if det["play"] else "")
         p["video"] = note.get("video_url") or (det["video"][0] if det["video"] else "")
@@ -118,6 +129,9 @@ class HubMixin:
         rows = self.db.rows("SELECT %s FROM prj_project%s" % (LIST_COLS, (" WHERE " + " AND ".join(where))
                                                                 if where else ""))
         notes, assigns, plats = self._note_map(), self._assign_map(), self._platform_map()
+        icons = self._icon_map()
+        for p in rows:
+            p["icon_png"] = icons.get(p["name"])
         cat_by_id = {c["id"]: c for c in self.categories()}
         tasks = {r["name"]: r["n"] for r in
                  self.db.rows("SELECT name, COUNT(*) AS n FROM prj_task WHERE done=0 GROUP BY name")}
@@ -400,7 +414,7 @@ class HubMixin:
 
     # ================================================================ 彙整 GitHub
     def sync_github(self, progress=None, releases="auto", stop=None):
-        """① 專案清單 ② README ③ 最新發佈版本（API 次數不夠時改用不扣次數的方式）。回傳統計 dict。"""
+        """① 專案清單 ② README ③ 最新發佈版本（API 次數不夠時改用不扣次數的方式）④ 專案圖示。回傳統計 dict。"""
         self.need("SYNC", 2)
         say = progress or (lambda text, done=0, total=0: None)
         st = self.settings_row()
@@ -417,8 +431,8 @@ class HubMixin:
             raise BizError("連不到 GitHub，請確認網路：%s" % e)
         now = dt.datetime.now()
         known = {r["name"]: r for r in self.db.rows("SELECT name, pushed_at, readme IS NOT NULL AS has_readme, "
-                                                    "rel_checked, rel_tag, source FROM prj_project")}
-        stat = dict(total=len(repos), new=0, readme=0, release=0, release_free=0, platforms=0, gone=0)
+                                                    "rel_checked, rel_tag, source, icon_checked, icon_path FROM prj_project")}
+        stat = dict(total=len(repos), new=0, readme=0, release=0, release_free=0, platforms=0, gone=0, icons=0)
         fresh = set()
         for r in repos:
             name = r["name"]
@@ -480,11 +494,18 @@ class HubMixin:
             stat["release_free" if free else "release"] += 1
             stat["platforms"] += self._auto_platforms(r["name"], (rel or {}).get("assets") or [],
                                                       r.get("homepage") or "", (rel or {}).get("tag_name") or "")
+        # ④ 專案圖示：有更新過或還沒找過的才找
+        need = [r for r in repos if not (known.get(r["name"], {}).get("icon_path") or "").startswith("manual:")
+                and (r["name"] in changed or not known.get(r["name"], {}).get("icon_checked"))]
+        if need and not (stop and stop()):
+            stat["icons"] = self._fetch_icons(gw, need, say, stop)
         # 新專案依規則自動分類
         stat["classified"] = self.auto_classify(only_uncategorized=True) if self.can("CAT", 2) else 0
         note = "共 %(total)d 個專案，新增 %(new)d、README %(readme)d、發佈版本 %(release)d" % stat
         if stat["release_free"]:
             note += "（另 %d 個改用發佈頁查詢）" % stat["release_free"]
+        if stat["icons"]:
+            note += "、圖示 %d" % stat["icons"]
         if gw.remaining is not None:
             note += "；GitHub 剩餘次數 %s/%s" % (gw.remaining, gw.limit)
             stat["remaining"], stat["limit"] = gw.remaining, gw.limit
@@ -493,6 +514,52 @@ class HubMixin:
         stat["note"] = note
         say("完成：" + note, 1, 1)
         return stat
+
+    def _fetch_icons(self, gw, repos, say, stop=None):
+        """找每個專案的圖示並存成小圖（同時 6 個）。回傳找到圖示的專案數。"""
+        import base64
+        from concurrent.futures import ThreadPoolExecutor
+
+        from .github import make_thumb
+
+        def one(r):
+            if stop and stop():
+                return r["name"], None, None
+            use_api = gw.can_spend(reserve=8)
+            path, data = gw.find_icon(r["full_name"], r.get("default_branch"), r.get("private"), use_api)
+            png = make_thumb(data) if data else b""
+            return r["name"], path if png else "", base64.b64encode(png).decode("ascii") if png else ""
+        found = 0
+        with ThreadPoolExecutor(6) as ex:
+            for i, (name, path, b64) in enumerate(ex.map(one, repos)):
+                if path is None:
+                    continue
+                say("④ 找專案圖示：%s" % name, i + 1, len(repos))
+                self.db.exec("UPDATE prj_project SET icon_path=%s, icon_png=%s, icon_checked=1 "
+                             "WHERE name=%s AND icon_path NOT LIKE 'manual:%%'", (path, b64 or None, name))
+                found += bool(b64)
+        return found
+
+    def set_icon(self, name, data_b64):
+        """手動指定專案圖示（圖檔內容 base64）；之後彙整不會覆蓋。"""
+        import base64
+
+        from .github import make_thumb
+        self.need("PRJ", 2)
+        if not self.db.value("SELECT 1 FROM prj_project WHERE name=%s", (name,)):
+            raise BizError("找不到專案 %s" % name)
+        png = make_thumb(base64.b64decode(data_b64 or ""))
+        if not png:
+            raise BizError("看不懂這個圖檔，請選 PNG、JPG、ICO 或 WebP")
+        self.db.exec("UPDATE prj_project SET icon_path='manual:', icon_png=%s, icon_checked=1 WHERE name=%s",
+                     (base64.b64encode(png).decode("ascii"), name))
+        self.log("icon", name, "手動指定")
+
+    def clear_icon(self, name):
+        """改回自動尋找圖示（下次彙整時重新找）。"""
+        self.need("PRJ", 2)
+        self.db.exec("UPDATE prj_project SET icon_path='', icon_png=NULL, icon_checked=0 WHERE name=%s", (name,))
+        self.log("icon", name, "改回自動")
 
     def _save_release(self, name, rel, homepage=""):
         if not rel:
@@ -708,7 +775,8 @@ class HubMixin:
                 cats=[c["id"] for c in p["cats"]],
                 platforms={k: dict(status=v.get("status") or 0, version=v.get("version") or "")
                            for k, v in p["platforms"].items() if v.get("status")},
-                has_readme=p["name"] in readmes))
+                has_readme=p["name"] in readmes,
+                icon=("data:image/png;base64," + p["icon_png"]) if p.get("icon_png") else "", symbol=p["symbol"]))
         data = dict(app="資料助秘專案彙整", schema=1, owner=st.get("github_owner") or "",
                     team=(st.get("name") or ""), generated=dt.datetime.now().isoformat(timespec="seconds"),
                     categories=[dict(id=c["id"], name=c["name"], color=c["color"]) for c in self.categories()

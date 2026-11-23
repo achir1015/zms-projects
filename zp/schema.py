@@ -71,7 +71,10 @@ TABLES = [
         ("rel_checked", "TINYINT NOT NULL DEFAULT 0", "已查過發佈版本"),
         ("source", "VARCHAR(10) NOT NULL DEFAULT 'github'", "來源 github／manual"),
         ("gone", "TINYINT NOT NULL DEFAULT 0", "GitHub 上已找不到（刪除或改名）"),
-        ("synced_at", "DATETIME NULL", "彙整時間")], ["KEY ix_pushed (pushed_at)"]),
+        ("synced_at", "DATETIME NULL", "彙整時間"),
+        ("icon_path", "VARCHAR(255) NOT NULL DEFAULT ''", "專案圖示在儲存庫裡的路徑"),
+        ("icon_png", "MEDIUMTEXT", "專案小圖示（96×96 PNG，base64）"),
+        ("icon_checked", "TINYINT NOT NULL DEFAULT 0", "已找過專案圖示")], ["KEY ix_pushed (pushed_at)"]),
     ("prj_note", "專案便利貼（手動補充，彙整時不會被覆蓋）", [
         ("name", "VARCHAR(100) NOT NULL PRIMARY KEY", "專案名稱"),
         ("status", "VARCHAR(10) NOT NULL DEFAULT ''", "專案狀態 PLAN 規劃中、DEV 開發中、LIVE 已上線、HOLD 暫停、END 結束"),

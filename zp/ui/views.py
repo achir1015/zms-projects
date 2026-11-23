@@ -10,7 +10,7 @@ import flet as ft
 from .. import rocdate
 from ..seed import PALETTE, PLATFORMS, PLT_STATUS, PRIORITY
 from . import theme as T
-from .projects import PLAT_COLOR, when
+from .projects import PLAT_COLOR, project_icon, when
 
 I = ft.Icons
 
@@ -71,9 +71,11 @@ class Matrix(ft.Column):
                     bgcolor=bg if s not in (0, 9) else "#F8FAFC", tooltip=r.get("note") or None,
                     ink=self.can, on_click=(lambda e, p=p, c=code: self.edit(p, c)) if self.can else None))
             lines.append(ft.Container(ft.Row([
-                ft.Column([ft.Text(p["display"], size=13, weight=ft.FontWeight.W_600, max_lines=1,
-                                   overflow=ft.TextOverflow.ELLIPSIS),
-                           T.muted(p["name"], 11)], spacing=0, width=300)] + cells, spacing=8),
+                ft.Row([project_icon(p, 28),
+                        ft.Column([ft.Text(p["display"], size=13, weight=ft.FontWeight.W_600, max_lines=1,
+                                           overflow=ft.TextOverflow.ELLIPSIS),
+                                   T.muted(p["name"], 11)], spacing=0, expand=True)], spacing=8, width=300)] + cells,
+                spacing=8),
                 padding=ft.Padding.symmetric(horizontal=14, vertical=5),
                 border=ft.Border.only(bottom=ft.BorderSide(1, "#EDF1F6"))))
         if T.MOBILE:                          # 手機：每個專案一張小卡，六個平台排成 3×2
@@ -96,9 +98,10 @@ class Matrix(ft.Column):
                         bgcolor=bg if s not in (0, 9) else "#F8FAFC", ink=self.can,
                         on_click=(lambda e, p=p, c=code: self.edit(p, c)) if self.can else None))
                 lines.append(ft.Container(ft.Column([
-                    ft.Text(p["display"], size=14, weight=ft.FontWeight.W_700, max_lines=2,
-                            overflow=ft.TextOverflow.ELLIPSIS),
-                    T.muted(p["name"], 11),
+                    ft.Row([project_icon(p, 34), ft.Column([
+                        ft.Text(p["display"], size=14, weight=ft.FontWeight.W_700, max_lines=2,
+                                overflow=ft.TextOverflow.ELLIPSIS),
+                        T.muted(p["name"], 11)], spacing=0, expand=True)], spacing=10),
                     ft.ResponsiveRow(cells, spacing=6, run_spacing=6)], spacing=4),
                     padding=12, border=ft.Border.only(bottom=ft.BorderSide(1, "#EDF1F6"))))
             if not self.rows:
@@ -343,7 +346,7 @@ class Sync(ft.Column):
         self.msg.value = text
         if total:
             self.bar.value = done / total
-        if not text.startswith("②") and not text.startswith("③") or done in (1, total):
+        if not text.startswith(("②", "③", "④")) or done in (1, total):
             self.log.controls.append(ft.Text(time.strftime("%H:%M:%S ") + text, size=12, color=T.MUTED))
         try:
             self.update()

@@ -165,6 +165,41 @@ class Gateway:
                 return ""
         return ""
 
+    # ------------------------------------------------------------ 專案圖示
+    def find_icon(self, full_name, branch, private=False, use_api=True):
+        """找專案的圖示檔，回傳 (路徑, 圖檔內容 bytes)；找不到回傳 ("", b"")。
+        有 API 次數時讀整個檔案清單挑最像圖示的檔案；沒有次數時依常見位置逐一試（raw，不扣次數）。"""
+        branch = branch or "main"
+        paths = []
+        if use_api and self.can_spend(reserve=5):
+            try:
+                tree = self.get_json("/repos/%s/git/trees/%s?recursive=1" % (full_name, urllib.parse.quote(branch)))
+                paths = [t["path"] for t in (tree or {}).get("tree", []) if t.get("type") == "blob"]
+            except RateLimit:
+                paths = []
+            except Exception:
+                paths = []
+        cands = rank_icons(paths) if paths else ICON_GUESSES
+        for p in cands[:3] if paths else cands:
+            data = self._raw_file(full_name, branch, p, private)
+            if data and _looks_like_image(data):
+                return p, data
+        return "", b""
+
+    def _raw_file(self, full_name, branch, path, private=False):
+        try:
+            if private and self.token:
+                url = "%s/repos/%s/contents/%s?ref=%s" % (API, full_name, urllib.parse.quote(path),
+                                                         urllib.parse.quote(branch))
+                with self._open(url, {"Accept": "application/vnd.github.raw+json"}, timeout=15) as r:
+                    self._note_rate(r.headers)
+                    return r.read(4 * 1024 * 1024)
+            url = "%s/%s/%s/%s" % (RAW, full_name, urllib.parse.quote(branch), urllib.parse.quote(path))
+            with self._open(url, timeout=15) as r:
+                return r.read(4 * 1024 * 1024)
+        except Exception:
+            return b""
+
     # ------------------------------------------------------------ 寫入（發佈線上版）
     def _send(self, method, path, body=None):
         if not self.token:
@@ -206,6 +241,98 @@ class Gateway:
         return c["sha"]
 
 
+# ================================================================ 專案圖示
+# 沒有 API 次數時依序試的常見位置（Flet／Electron／網頁／Tauri／Android／Godot 匯出等）
+ICON_GUESSES = [
+    "assets/icon.png", "icon.png", "build/icon.png", "docs/icon.png", "public/icon.png", "app/icon.png",
+    "assets/images/icon.png", "src-tauri/icons/128x128@2x.png", "src-tauri/icons/icon.png", "resources/icon.png",
+    "static/icon.png", "images/icon.png", "img/icon.png", "logo.png", "assets/logo.png", "public/logo.png",
+    "docs/ios/icon-512.png", "public/favicon.png", "favicon.png", "web/favicon.png",
+    "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png", "app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+    "assets/icon.ico", "icon.ico", "build/icon.ico", "packaging/icon.ico", "favicon.ico", "public/favicon.ico",
+    # 網頁 PWA、Godot 匯出、Xcode、Android 專案常見位置
+    "icons/icon-512.png", "docs/icons/icon-512.png", "public/icons/icon-512.png", "icons/icon-1024.png",
+    "assets/icon_1024.png", "platform/icon_256.png", "docs/icon-512.png", "apple-touch-icon.png",
+    "docs/icons/apple-touch-icon.png", "icons/icon-192.png", "android/res/mipmap-xxxhdpi/ic_launcher.png",
+    "res/mipmap-xxxhdpi/ic_launcher.png", "docs/favicon.ico", "docs/icons/favicon.ico",
+]
+_SKIP_DIR = re.compile(r"(^|/)(node_modules|\.venv|venv|site-packages|third_party|vendor|tests?|examples?|"
+                       r"\.github|screens|screenshots|dist|out|\.dart_tool|Pods|DerivedData)/", re.I)
+_ICON_NAME = re.compile(r"(^|/)(icon|app[-_]?icon|appicon|ic_launcher(_round)?|logo|favicon(-\d+)?|"
+                        r"icon[-_]?\d+(x\d+)?|apple-touch-icon|icon[-_]maskable[-_]?\d*|"
+                        r"\d+x\d+(@2x)?)\.(png|ico|jpe?g|webp)$", re.I)
+
+
+def rank_icons(paths):
+    """從檔案清單挑出最像「這個專案的圖示」的檔案，依可能性排序。"""
+    out = []
+    for p in paths:
+        if _SKIP_DIR.search(p) or not _ICON_NAME.search(p):
+            continue
+        low = p.lower()
+        name = low.rsplit("/", 1)[-1]
+        depth = low.count("/")
+        score = 0
+        score += {"icon.png": 50, "app_icon.png": 45, "appicon.png": 45, "ic_launcher.png": 35,
+                  "logo.png": 30, "apple-touch-icon.png": 30, "favicon.png": 25, "icon.ico": 20,
+                  "favicon.ico": 12}.get(name, 25 if name.startswith("icon") else 15)
+        if re.search(r"(^|/)(assets|build|public|packaging|resources|static|docs|app|icons|platform)/", low):
+            score += 10
+        if "appiconset" in low:
+            score += 6
+        m = re.search(r"(\d{2,4})", name)
+        size = int(m.group(1)) if m else 0
+        if size >= 512:
+            score += 12
+        elif size >= 180:
+            score += 8
+        elif size and size < 64:
+            score -= 12
+        if "mipmap-xxxhdpi" in low or "@2x" in name:
+            score += 8
+        if "maskable" in name or "_round" in name or "_fg" in name:
+            score -= 6
+        if "mipmap-" in low and "xxxhdpi" not in low:
+            score -= 15
+        if "/android/" in "/" + low or "/ios/" in "/" + low:
+            score -= 3
+        if name.endswith(".ico"):
+            score -= 8
+        score -= depth * 4
+        out.append((score, p))
+    out.sort(key=lambda x: -x[0])
+    return [p for _, p in out]
+
+
+def _looks_like_image(data):
+    return (data[:8] == b"\x89PNG\r\n\x1a\n" or data[:3] == b"\xff\xd8\xff" or data[:4] == b"\x00\x00\x01\x00"
+            or (data[:4] == b"RIFF" and data[8:12] == b"WEBP"))
+
+
+def make_thumb(data, size=96):
+    """圖示縮成 size×size 的 PNG（透明底、置中）；失敗回傳 b""。需要 Pillow（只在電腦版執行）。"""
+    try:
+        import io
+
+        from PIL import Image
+        im = Image.open(io.BytesIO(data))
+        if getattr(im, "n_frames", 1) > 1 and im.format == "ICO":
+            im.size = max(im.info.get("sizes") or [im.size])
+        im = im.convert("RGBA")
+        bbox = im.getbbox()
+        if bbox:
+            im = im.crop(bbox)
+        im.thumbnail((size, size), Image.LANCZOS)
+        bg = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        bg.paste(im, ((size - im.width) // 2, (size - im.height) // 2), im)
+        buf = io.BytesIO()
+        # 128 色調色盤 PNG（保留透明）：約 3～5 KB，一百多個專案傳到手機與線上版也不重
+        bg.quantize(colors=128, method=Image.Quantize.FASTOCTREE).save(buf, format="PNG", optimize=True)
+        return buf.getvalue()
+    except Exception:
+        return b""
+
+
 def slim(data):
     """只留下需要的欄位，避免快取太大。"""
     def repo(r):
@@ -218,6 +345,8 @@ def slim(data):
         return {k: r.get(k) for k in ("tag_name", "name", "html_url", "published_at", "draft")} | {
             "assets": [{k: a.get(k) for k in ("name", "browser_download_url", "size", "download_count")}
                        for a in r.get("assets") or []]}
+    if isinstance(data, dict) and isinstance(data.get("tree"), list):     # 檔案清單只留路徑與種類
+        return {"tree": [{"path": t.get("path"), "type": t.get("type")} for t in data["tree"]]}
     if not isinstance(data, list):
         return data
     return [repo(x) if "stargazers_count" in x else rel(x) if "tag_name" in x else x for x in data]
