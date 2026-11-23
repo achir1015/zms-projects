@@ -322,6 +322,10 @@ def make_thumb(data, size=96):
         bbox = im.getbbox()
         if bbox:
             im = im.crop(bbox)
+        if max(im.size) < size:               # 16／32 像素的 favicon 也放大到滿格，不要縮在中間一小點
+            r = size / max(im.size)
+            im = im.resize((max(1, round(im.width * r)), max(1, round(im.height * r))),
+                           Image.NEAREST if max(im.size) <= 32 else Image.LANCZOS)
         im.thumbnail((size, size), Image.LANCZOS)
         bg = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         bg.paste(im, ((size - im.width) // 2, (size - im.height) // 2), im)
