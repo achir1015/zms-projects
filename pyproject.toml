@@ -24,8 +24,8 @@ exclude = ["tests", "tools", "packaging", "data", ".venv", "dist", "dist-install
 scheme = "zmsprojects"
 host = "connect"
 
-[tool.flet.android]
-permissions = { "android.permission.INTERNET" = true }
+[tool.flet.android.permission]
+"android.permission.INTERNET" = true
 
 [tool.flet.ios]
 bundle_id = "com.achir.zmsprojects"
