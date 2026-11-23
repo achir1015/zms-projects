@@ -27,4 +27,10 @@ if __name__ == "__main__":
         os.environ["FLET_SERVER_IP"] = host
         ft.run(main, view=None, port=int(port), host=host, assets_dir=assets)
     else:
+        # 桌面版只能開一個（每個視窗都會啟動資料庫，兩個搶同一個資料夾會弄壞資料）；手機 App 不需要
+        if not (os.environ.get("FLET_APP_STORAGE_DATA") or os.environ.get("ZP_MOBILE")):
+            from zp import single
+            if not single.acquire():
+                single.activate_existing()
+                sys.exit(0)
         ft.run(main, assets_dir=assets)
