@@ -151,7 +151,7 @@ BUTTON_SIZE = {"online": (172, 40), "download": (176, 40)}     # 顯示大小（
 def _badge(icon_base, key, link):
     text = BUTTONS[key][0]
     w, h = BUTTON_SIZE[key]
-    return '<a href="%s"><img src="%s_%s.png" width="%d" height="%d" alt="%s"></a>' % (link, icon_base, key, w, h, text)
+    return '<a href="%s"><img src="%sbtn-%s.png" width="%d" height="%d" alt="%s"></a>' % (link, icon_base, key, w, h, text)
 
 
 def icon_files(snap):
@@ -162,7 +162,7 @@ def icon_files(snap):
     for key, (text, color) in BUTTONS.items():
         png, w, h = _button(text, color)
         BUTTON_SIZE[key] = (w, h)
-        files["_%s.png" % key] = png
+        files["btn-%s.png" % key] = png
     return files
 
 
