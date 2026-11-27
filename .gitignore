@@ -27,3 +27,4 @@ web.log
 .claude/
 docs/*.png
 !docs/icon.png
+/build-profile/
