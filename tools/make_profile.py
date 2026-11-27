@@ -5,7 +5,8 @@
   python tools/make_profile.py --snap 檔案.json  改用已匯出的 public_snapshot
   加 --preview：另外產生 preview.html（用 GitHub 的 Markdown 轉換，外觀與個人首頁相同）
 
-輸出在 build-profile/（不進 git）。
+輸出在 build-profile/（不進 git）。正式的首頁由個人首頁儲存庫的 GitHub Actions（tools/profile_ci.py）產生，
+圖示放在 GitHub Pages；這支工具是本機預覽用，圖示放 build-profile/icons/。
 """
 import json
 import os
@@ -61,11 +62,16 @@ def preview(md):
 
 def main():
     from zp import profile
-    md, files = profile.build(snapshot())
+    snap = snapshot()
+    if "--edits" in sys.argv:
+        with open(sys.argv[sys.argv.index("--edits") + 1], encoding="utf-8") as f:
+            profile.apply_edits(snap, json.load(f))
+    files = profile.icon_files(snap)
+    md = profile.build(snap, icon_base="icons/")
     shutil.rmtree(OUT, ignore_errors=True)
     os.makedirs(os.path.join(OUT, "icons"))
-    for path, data in files.items():
-        with open(os.path.join(OUT, path), "wb") as f:
+    for name, data in files.items():
+        with open(os.path.join(OUT, "icons", name), "wb") as f:
             f.write(data)
     with open(os.path.join(OUT, "README.md"), "w", encoding="utf-8") as f:
         f.write(md)

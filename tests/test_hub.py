@@ -201,3 +201,33 @@ def test_rank_icons_and_manual_icon(biz):
     assert data["projects"][0]["icon"].startswith("data:image/png;base64,")
     biz.clear_icon("demo")
     assert not biz.project("demo")["icon_png"]
+
+
+def test_online_edits_and_profile(biz, monkeypatch):
+    """線上版管理者整理的分類（edits.json）套回資料庫，個人首頁總表也照著分組。"""
+    from zp import github, profile
+    _add(biz, "proj-a", description="A")
+    _add(biz, "proj-b", description="B")
+    biz.db.exec("UPDATE sys_company SET pages_repo='o/r' WHERE id=1")
+    cats = {c["name"]: c["id"] for c in biz.categories()}
+    edits = dict(at="2099-01-01T00:00:00", by="o", deleted=[cats["長照"]],
+                 categories=[dict(id=cats["遊戲"], name="好玩遊戲", color="#112233"),
+                             dict(id=-1, name="新分類", color="#445566")],
+                 cats={"proj-a": [-1, cats["遊戲"]], "proj-b": [], "不存在": [-1]})
+    monkeypatch.setattr(github.Gateway, "raw_json", lambda self, repo, path, branch="main": edits)
+    assert biz.apply_online_edits() == 2
+    assert biz.apply_online_edits() == 0                       # 同一份整理不重複套用
+    names = {c["name"] for c in biz.categories()}
+    assert {"好玩遊戲", "新分類"} <= names and "長照" not in names and "遊戲" not in names
+    got = {p["name"]: {c["name"] for c in p["cats"]} for p in biz.all_projects()}
+    assert got["proj-a"] == {"好玩遊戲", "新分類"} and got["proj-b"] == set()
+    # 個人首頁總表：分類順序＝分類設定順序，每個專案只出現一次，未分類放「其他」
+    snap, _ = biz.public_snapshot()
+    md = profile.build(snap, icon_base="icons/")
+    assert md.count("**[proj-a](") == 1 and md.count("**[proj-b](") == 1
+    order = [c["name"] for c in snap["categories"]]
+    heads = [l.split(" ", 2)[2].rsplit("（", 1)[0] for l in md.splitlines() if l.startswith("## ")]
+    assert heads == [n for n in order if n in heads] + ["未分類"]
+    # 線上版的 overlay：edits 比資料舊就不套用
+    old = dict(edits, at="2000-01-01T00:00:00")
+    assert profile.apply_edits(json.loads(json.dumps(snap)), old) is False

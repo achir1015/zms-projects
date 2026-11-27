@@ -150,6 +150,41 @@ dialog::backdrop{background:#0f172a99}
   opacity:0;transition:opacity .25s;pointer-events:none;z-index:20;max-width:calc(100vw - 32px)}
 .toast.show{opacity:1}
 footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
+/* 管理模式 */
+.adminbar{display:none;background:#FFF4D6;color:#7A4B00;border-bottom:1px solid #F0D58A}
+:root[data-theme="dark"] .adminbar{background:#3A2F12;color:#F5C66B;border-color:#5A4718}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .adminbar{background:#3A2F12;color:#F5C66B;border-color:#5A4718}}
+body.admin .adminbar{display:block}
+.adminbar .wrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:8px;padding-bottom:8px;font-size:14px}
+.adminbar b{font-weight:800}
+.adminbar .grow{flex:1;min-width:120px}
+.abtn{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;height:34px;padding:0 12px;border-radius:9px;font-size:13.5px;font-weight:700;
+  background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.abtn.pri{background:#1E4D8C;color:#fff;border-color:#1E4D8C}
+.abtn.warn{color:#B91C1C}
+.abtn[disabled]{opacity:.45;cursor:default}
+.abtn .ms{font-size:18px}
+.sel.sm{height:34px;border-radius:9px;font-size:13.5px}
+.pick{position:absolute;top:10px;right:10px;width:22px;height:22px;accent-color:#1E4D8C;cursor:pointer;display:none}
+body.admin .pick{display:block}
+.pcard{position:relative}
+body.admin .pcard .pt{padding-right:26px}
+.pcard.sel{border-color:#1E4D8C;box-shadow:0 0 0 2px #1E4D8C55}
+.catbtn{display:none}
+body.admin .catbtn{display:inline-flex}
+.dirty{outline:2px dashed var(--gold);outline-offset:2px}
+.cgrid{display:flex;flex-wrap:wrap;gap:8px}
+.ctog{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:18px;border:1px solid var(--line);font-size:14px}
+.ctog[aria-pressed="true"]{background:var(--tc);color:#fff;border-color:var(--tc);font-weight:700}
+.crow{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.crow input[type=text]{flex:1;min-width:0;height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;background:var(--card)}
+.crow input[type=color]{width:40px;height:36px;border:1px solid var(--line);border-radius:8px;padding:2px;background:var(--card)}
+.crow .n{font-size:12px;color:var(--muted);width:48px;text-align:right}
+.field{display:flex;flex-direction:column;gap:6px;font-size:14px}
+.field input{height:40px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:var(--card)}
+.note{font-size:13px;color:var(--muted);line-height:1.6}
+.note ol{margin:6px 0;padding-left:20px}
+.dfoot{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px 18px;flex-wrap:wrap}
 @media (max-width:640px){
   .bar h1{font-size:17px}
   .bar .sub{display:none}
@@ -168,6 +203,7 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
       <div class="grow"><h1>專案彙整線上版</h1><div class="sub" id="who">載入中…</div></div>
       <button class="ibtn" id="refresh" title="從 GitHub 取得最新的星星數、說明與更新時間（不需登入）"><span class="ms">sync</span><span class="lbl">即時更新</span></button>
       <button class="ibtn" id="themeBtn" aria-label="切換深色／淺色"><span class="ms">contrast</span></button>
+      <button class="ibtn" id="adminBtn" title="管理者整理分類（需要 GitHub 權杖；其他人只能瀏覽）"><span class="ms">admin_panel_settings</span><span class="lbl" id="adminLbl">管理</span></button>
     </div>
     <div class="kpis" id="kpis"></div>
   </div>
@@ -188,6 +224,21 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
     <div class="chips" id="filters"></div>
     <div class="tabs" id="tabs" role="tablist" aria-label="分類"></div>
   </div>
+<div class="adminbar" id="adminbar" role="region" aria-label="管理模式">
+  <div class="wrap">
+    <span class="ms">edit_note</span><span class="grow"><b>管理模式</b>：<span id="aWho"></span><span id="aDirty"></span></span>
+    <span id="aSel" style="display:none;align-items:center;gap:6px">已選 <b id="aSelN">0</b> 個：
+      <select class="sel sm" id="aAdd" aria-label="加入分類"><option value="">加入分類…</option></select>
+      <select class="sel sm" id="aDel" aria-label="移出分類"><option value="">移出分類…</option></select>
+      <button class="abtn" id="aClear"><span class="ms">deselect</span>取消選取</button>
+    </span>
+    <button class="abtn" id="aAll"><span class="ms">select_all</span>全選這頁</button>
+    <button class="abtn" id="aCats"><span class="ms">label</span>分類管理</button>
+    <button class="abtn warn" id="aUndo" disabled><span class="ms">undo</span>放棄修改</button>
+    <button class="abtn pri" id="aSave" disabled><span class="ms">cloud_upload</span>儲存</button>
+    <button class="abtn" id="aOut"><span class="ms">logout</span>登出</button>
+  </div>
+</div>
 </div>
 <main class="wrap">
   <p class="count" id="count"></p>
@@ -196,6 +247,7 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
 <footer class="wrap">資料由「資料助秘專案彙整」發佈 · <span id="gen"></span> · 系統開發：吳玉柱 先生 與 Claude AI Opus 5.5 ·
   <a href="https://github.com/achir1015/zms-projects/releases/latest">下載桌面版</a></footer>
 <dialog id="dlg" aria-labelledby="dTitle"></dialog>
+<dialog id="adlg" aria-labelledby="aTitle"></dialog>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -217,6 +269,8 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
                    ["videos","有影片","smart_display"],["live","有線上版","language"]];
 
   let D = null, readmes = null, tab = "all", view = "cards", filters = new Set();
+  // 管理模式：token＝GitHub 權杖（只存在管理者自己的瀏覽器）；edits＝已儲存的線上整理；dirty＝這次還沒儲存的專案
+  const A = {token: "", login: "", edits: null, dirty: new Set(), deleted: new Set(), catsDirty: false, sel: new Set(), snapshot: null};
   let state = {q: "", sort: "pushed"};
   try { Object.assign(state, JSON.parse(sessionStorage.getItem("zp-state") || "{}")); } catch (e) {}
 
@@ -293,13 +347,15 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
     if (p.stars) tags.push(`<span class="tag"><span class="ms">star</span>${p.stars}</span>`);
     if (p.archived) tags.push(`<span class="tag">已封存</span>`);
     if (p.fork) tags.push(`<span class="tag">Fork</span>`);
-    return `<article class="pcard" tabindex="0" data-n="${esc(p.name)}" aria-label="${esc(p.title)}">
+    const on = A.sel.has(p.name);
+    return `<article class="pcard${on ? " sel" : ""}${A.dirty.has(p.name) ? " dirty" : ""}" tabindex="0" data-n="${esc(p.name)}" aria-label="${esc(p.title)}">
+      <input type="checkbox" class="pick" data-pick="${esc(p.name)}" data-stop ${on ? "checked" : ""} aria-label="選取 ${esc(p.title)}">
       <div class="ph">${avatar(p)}
         <div class="pt"><h3>${esc(p.title)}</h3><div class="nm">${esc(p.name)}</div></div></div>
       <p class="desc">${esc(p.description || "（沒有說明）")}</p>
       <div class="tags">${tags.join("")}</div>
       <div class="plats">${plats(p)}</div>
-      <div class="links">${linkBtns(p, true)}</div>
+      <div class="links">${linkBtns(p, true)}<button class="lk catbtn" data-cat="${esc(p.name)}" data-stop><span class="ms">label</span>分類</button></div>
       <div class="foot"><span>更新 ${day(p.pushed)}</span><span>${p.rel.published ? "發佈 " + day(p.rel.published) : ""}</span></div>
     </article>`;
   }
@@ -319,6 +375,7 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
     $("count").textContent = `顯示 ${arr.length} 個專案` + (arr.length !== D.projects.length ? `（共 ${D.projects.length} 個）` : "");
     if (!arr.length) { $("list").innerHTML = `<div class="empty"><span class="ms" style="font-size:48px">search_off</span><p>沒有符合條件的專案</p></div>`; return; }
     $("list").innerHTML = view === "cards" ? `<div class="grid">${arr.map(card).join("")}</div>` : matrix(arr);
+    adminBar();
   }
 
   // ------------------------------------------------------------ 明細
@@ -364,11 +421,13 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
       <div class="db">
         <div class="links">${linkBtns(p, false)}</div>
         ${p.videos.length ? `<section id="dVid"><h4>播放媒體</h4>${videosHtml(p)}</section>` : ""}
+        ${A.token ? `<section><h4>分類（管理）</h4>${catToggles(p)}</section>` : ""}
         <section><h4>專案資訊</h4><dl class="kv">${info.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl></section>
         <section><h4>平台進度</h4>${ptable}</section>
         ${assets ? `<section><h4>下載檔案（${esc(p.rel.tag)}）</h4>${assets}</section>` : ""}
         <section><h4>README</h4><div class="readme" id="dReadme">${p.has_readme ? "載入中…" : "（沒有 README）"}</div></section>
       </div>`;
+    bindToggles(dlg, p);
     dlg.querySelectorAll("[data-video]").forEach(b => b.onclick = () => { const v = $("dVid"); v && v.scrollIntoView({behavior: "smooth"}); const m = v && v.querySelector("video"); m && m.play().catch(() => {}); });
     $("dClose").onclick = () => dlg.close();
     if (!dlg.open) dlg.showModal();
@@ -381,10 +440,14 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
       el.innerHTML = r[p.name] ? readmeHtml(p, r[p.name]) : "（README 載入失敗）";
     }
   }
+  addEventListener("beforeunload", ev => { if (A.dirty.size || A.catsDirty) { ev.preventDefault(); ev.returnValue = ""; } });
   $("dlg").addEventListener("close", () => { if (history.replaceState) history.replaceState(null, "", location.pathname + location.search); });
   $("dlg").addEventListener("click", e => { if (e.target === $("dlg")) $("dlg").close(); });
 
   $("list").addEventListener("click", e => {
+    const pk = e.target.closest("[data-pick]");
+    if (pk) { pk.checked ? A.sel.add(pk.dataset.pick) : A.sel.delete(pk.dataset.pick); pk.closest(".pcard").classList.toggle("sel", pk.checked); adminBar(); return; }
+    const cb = e.target.closest("[data-cat]"); if (cb) { catDialog(cb.dataset.cat); return; }
     const v = e.target.closest("[data-video]"); if (v) { e.preventDefault(); open(v.dataset.video, true); return; }
     if (e.target.closest("[data-stop]")) return;
     const c = e.target.closest("[data-n]"); if (c) open(c.dataset.n);
@@ -429,14 +492,203 @@ footer{color:var(--muted);font-size:13px;padding:10px 0 30px}
     btn.disabled = false; btn.style.opacity = "";
   };
 
+  // ------------------------------------------------------------ 管理模式（整理分類）
+  // 存檔方式：用管理者的 GitHub 權杖把整理結果寫進 docs/data/edits.json（commit 到 zms-projects），
+  // 桌面版「彙整 GitHub／發佈線上版」時會套用回資料庫；個人首頁總表也依它更新。沒有權杖的人只能瀏覽。
+  const REPO = "achir1015/zms-projects", EDITS = "docs/data/edits.json";
+  const PALETTE = ["#2563EB","#16A34A","#D97706","#DC2626","#7C3AED","#0891B2","#DB2777","#475569","#0D9488","#CA8A04"];
+  const gh = (path, opt = {}) => fetch("https://api.github.com" + path, Object.assign({}, opt, {headers: Object.assign({
+    Authorization: "Bearer " + A.token, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}, opt.headers || {})}));
+  const nowLocal = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 19);   // 台灣時間，與桌面版的 generated 同格式
+  const b64 = s => btoa(unescape(encodeURIComponent(s)));
+  const unb64 = s => decodeURIComponent(escape(atob(s.replace(/\n/g, ""))));
+
+  function overlay(d, e) {          // 與 zp/profile.py 的 apply_edits 相同
+    if (!e || !e.at || e.at <= (d.generated || "")) return false;
+    d.categories = (e.categories || []).map(c => ({id: c.id, name: c.name, color: c.color || "#2563EB"}));
+    const ok = new Set(d.categories.map(c => c.id)), cats = e.cats || {};
+    for (const p of d.projects) p.cats = (cats[p.name] || p.cats).filter(c => ok.has(c));
+    return true;
+  }
+  function catToggles(p) {
+    return `<div class="cgrid">` + D.categories.map(c => `<button class="ctog" data-tog="${c.id}" style="--tc:${c.color}" aria-pressed="${p.cats.includes(c.id)}"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</button>`).join("")
+      + (D.categories.length ? "" : `<span class="note">還沒有分類，請先按「分類管理」新增。</span>`) + `</div>`;
+  }
+  function bindToggles(box, p) {
+    box.querySelectorAll("[data-tog]").forEach(b => b.onclick = () => {
+      const id = +b.dataset.tog, i = p.cats.indexOf(id);
+      i >= 0 ? p.cats.splice(i, 1) : p.cats.push(id);
+      b.setAttribute("aria-pressed", i < 0); A.dirty.add(p.name); render();
+    });
+  }
+  function catDialog(name) {
+    const p = D.projects.find(x => x.name === name); if (!p) return;
+    const d = $("adlg");
+    d.innerHTML = `<div class="dh">${avatar(p)}<div style="flex:1;min-width:0"><h2 id="aTitle">${esc(p.title)}</h2><div class="nm">點選要歸入的分類（可多選）</div></div>
+      <button class="xbtn" data-x aria-label="關閉"><span class="ms">close</span></button></div><div class="db">${catToggles(p)}</div>
+      <div class="dfoot"><button class="abtn pri" data-x>完成</button></div>`;
+    bindToggles(d, p);
+    d.querySelectorAll("[data-x]").forEach(b => b.onclick = () => d.close());
+    d.showModal();
+  }
+  function adminBar() {
+    document.body.classList.toggle("admin", !!A.token);
+    $("adminLbl").textContent = A.token ? "管理中" : "管理";
+    if (!A.token) return;
+    const n = A.dirty.size + (A.catsDirty ? 1 : 0);
+    $("aWho").textContent = A.login + " ";
+    $("aDirty").textContent = n ? `・未儲存：${A.dirty.size} 個專案${A.catsDirty ? "＋分類設定" : ""}` : "・沒有未儲存的修改";
+    $("aSave").disabled = $("aUndo").disabled = !n;
+    $("aSel").style.display = A.sel.size ? "inline-flex" : "none";
+    $("aSelN").textContent = A.sel.size;
+    const opts = D.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+    $("aAdd").innerHTML = `<option value="">加入分類…</option>` + opts;
+    $("aDel").innerHTML = `<option value="">移出分類…</option>` + opts;
+  }
+  function bulk(id, add) {
+    for (const name of A.sel) {
+      const p = D.projects.find(x => x.name === name); if (!p) continue;
+      const i = p.cats.indexOf(id);
+      if (add && i < 0) p.cats.push(id); else if (!add && i >= 0) p.cats.splice(i, 1); else continue;
+      A.dirty.add(name);
+    }
+    render(); toast((add ? "已加入「" : "已移出「") + (catOf(id) || {}).name + "」，記得按「儲存」");
+  }
+  $("aAdd").onchange = e => { if (e.target.value) bulk(+e.target.value, true); e.target.value = ""; };
+  $("aDel").onchange = e => { if (e.target.value) bulk(+e.target.value, false); e.target.value = ""; };
+  $("aClear").onclick = () => { A.sel.clear(); render(); };
+  $("aAll").onclick = () => { visible().forEach(p => A.sel.add(p.name)); render(); };
+
+  function catsManager() {
+    const d = $("adlg");
+    const cnt = id => D.projects.filter(p => p.cats.includes(id)).length;
+    const rows = () => D.categories.map((c, i) => `<div class="crow" data-i="${i}">
+        <input type="color" value="${esc(c.color)}" data-f="color" aria-label="顏色">
+        <input type="text" value="${esc(c.name)}" maxlength="40" data-f="name" aria-label="分類名稱">
+        <span class="n">${cnt(c.id)} 個</span>
+        <button class="xbtn" data-mv="-1" aria-label="上移" ${i ? "" : "disabled"}><span class="ms">arrow_upward</span></button>
+        <button class="xbtn" data-mv="1" aria-label="下移" ${i < D.categories.length - 1 ? "" : "disabled"}><span class="ms">arrow_downward</span></button>
+        <button class="xbtn" data-del aria-label="刪除"><span class="ms" style="color:#DC2626">delete</span></button></div>`).join("");
+    const draw = () => {
+      d.innerHTML = `<div class="dh"><span class="ms" style="font-size:28px">label</span><div style="flex:1"><h2 id="aTitle">分類管理</h2>
+        <div class="nm">改名稱、顏色、順序（就是頁簽和個人首頁總表的順序）；刪除分類不會刪除專案</div></div>
+        <button class="xbtn" data-x aria-label="關閉"><span class="ms">close</span></button></div>
+        <div class="db"><div>${rows()}</div>
+        <div class="crow"><input type="text" id="cNew" maxlength="40" placeholder="新分類名稱"><button class="abtn" id="cAdd"><span class="ms">add</span>新增</button></div></div>
+        <div class="dfoot"><button class="abtn pri" data-x>完成</button></div>`;
+      d.querySelectorAll("[data-x]").forEach(b => b.onclick = () => d.close());
+      d.querySelectorAll(".crow[data-i]").forEach(r => {
+        const i = +r.dataset.i, c = D.categories[i];
+        r.querySelectorAll("[data-f]").forEach(inp => inp.onchange = () => {
+          const v = inp.value.trim();
+          if (inp.dataset.f === "name" && (!v || D.categories.some(x => x !== c && x.name === v))) { toast("名稱不可空白或重複"); inp.value = c.name; return; }
+          c[inp.dataset.f] = inp.dataset.f === "color" ? inp.value.toUpperCase() : v; A.catsDirty = true; render();
+        });
+        r.querySelectorAll("[data-mv]").forEach(b => b.onclick = () => {
+          const j = i + +b.dataset.mv; [D.categories[i], D.categories[j]] = [D.categories[j], D.categories[i]]; A.catsDirty = true; render(); draw(); });
+        r.querySelector("[data-del]").onclick = () => {
+          const n = cnt(c.id);
+          if (!confirm(`刪除分類「${c.name}」？` + (n ? `\n裡面 ${n} 個專案只是移出這個分類，不會被刪除。` : ""))) return;
+          D.categories.splice(i, 1); if (c.id > 0) A.deleted.add(c.id);
+          for (const p of D.projects) { const k = p.cats.indexOf(c.id); if (k >= 0) { p.cats.splice(k, 1); A.dirty.add(p.name); } }
+          A.catsDirty = true; if (tab === String(c.id)) tab = "all"; render(); draw();
+        };
+      });
+      $("cAdd").onclick = () => {
+        const v = $("cNew").value.trim(); if (!v) return;
+        if (D.categories.some(x => x.name === v)) { toast("已有這個分類"); return; }
+        const id = Math.min(0, ...D.categories.map(c => c.id)) - 1;      // 新分類用負數暫時編號，桌面版套用時才給正式編號
+        D.categories.push({id, name: v, color: PALETTE[D.categories.length % PALETTE.length]}); A.catsDirty = true; render(); draw();
+      };
+    };
+    draw(); if (!d.open) d.showModal();
+  }
+  $("aCats").onclick = catsManager;
+
+  function loginDialog() {
+    const d = $("adlg");
+    d.innerHTML = `<div class="dh"><span class="ms" style="font-size:28px">admin_panel_settings</span><div style="flex:1"><h2 id="aTitle">管理者登入</h2>
+      <div class="nm">只有 ${esc(D.owner)} 本人能整理分類；其他人只能瀏覽</div></div><button class="xbtn" data-x aria-label="關閉"><span class="ms">close</span></button></div>
+      <div class="db"><div class="note">第一次使用要建立一組 GitHub 權杖（只做一次，之後這台電腦的瀏覽器會記住）：
+        <ol><li>開啟 <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub 建立權杖頁</a>（Fine-grained token）</li>
+        <li>Token name 填「專案彙整線上管理」，Expiration 選 1 年</li>
+        <li>Repository access 選「Only select repositories」，勾 <b>zms-projects</b> 和 <b>${esc(D.owner)}</b>（個人首頁）</li>
+        <li>Permissions → Repository permissions → <b>Contents</b> 選「Read and write」</li>
+        <li>按「Generate token」，複製後貼到下面</li></ol>
+        權杖只存在這個瀏覽器，只用來和 GitHub 溝通。公用電腦用完請按「登出」。</div>
+        <label class="field">GitHub 權杖<input type="password" id="tok" autocomplete="off" placeholder="github_pat_…"></label></div>
+      <div class="dfoot"><button class="abtn" data-x>取消</button><button class="abtn pri" id="tokOk"><span class="ms">login</span>登入</button></div>`;
+    d.querySelectorAll("[data-x]").forEach(b => b.onclick = () => d.close());
+    $("tokOk").onclick = async () => {
+      const t = $("tok").value.trim(); if (!t) return;
+      $("tokOk").disabled = true;
+      try { await login(t, true); d.close(); toast("已進入管理模式：勾選卡片或按「分類」整理，完成後按「儲存」"); }
+      catch (e) { toast(e.message); $("tokOk").disabled = false; }
+    };
+    d.showModal(); setTimeout(() => $("tok").focus(), 50);
+  }
+  async function login(t, remember) {
+    A.token = t;
+    try {
+      const u = await gh("/user"); if (!u.ok) throw new Error(u.status === 401 ? "權杖無效或已過期" : "GitHub 回應 " + u.status);
+      const me = await u.json();
+      if ((me.login || "").toLowerCase() !== (D.owner || "").toLowerCase()) throw new Error(`這是 ${me.login} 的權杖，只有 ${D.owner} 能管理`);
+      const r = await gh("/repos/" + REPO); const info = r.ok ? await r.json() : {};
+      if (!r.ok || !(info.permissions && info.permissions.push)) throw new Error("這組權杖沒有 zms-projects 的寫入權限（Contents：Read and write）");
+      A.login = me.login;
+      if (remember) try { localStorage.setItem("zp-admin", t); } catch (e) {}
+      render();
+    } catch (e) { A.token = ""; throw e; }
+  }
+  $("adminBtn").onclick = () => A.token ? toast("已在管理模式；要離開請按「登出」") : loginDialog();
+  $("aOut").onclick = () => {
+    if ((A.dirty.size || A.catsDirty) && !confirm("還有未儲存的修改，確定登出並放棄？")) return;
+    try { localStorage.removeItem("zp-admin"); } catch (e) {}
+    A.token = A.login = ""; A.sel.clear(); discard(); toast("已登出；這個瀏覽器不再記住權杖");
+  };
+  function discard() {
+    D = JSON.parse(A.snapshot); A.dirty.clear(); A.deleted.clear(); A.catsDirty = false;
+    if (tab !== "all" && tab !== "none" && !catOf(+tab)) tab = "all";
+    kpis(); render();
+  }
+  $("aUndo").onclick = () => { if (confirm("放棄這次還沒儲存的修改？")) discard(); };
+  $("aSave").onclick = async () => {
+    const btn = $("aSave"); btn.disabled = true; btn.lastChild.textContent = "儲存中…";
+    try {
+      // 先讀 GitHub 上最新的 edits.json（別的電腦可能剛存過），把這次的修改合併上去
+      const gen = JSON.parse(A.snapshot).generated || "";
+      const cur = await gh(`/repos/${REPO}/contents/${EDITS}?ref=main`);
+      let sha = null, prev = A.edits && A.edits.at > gen ? A.edits : null;
+      if (cur.ok) { const j = await cur.json(); sha = j.sha; const e = JSON.parse(unb64(j.content)); prev = e.at > gen ? e : null; }
+      else if (cur.status !== 404) throw new Error("讀取失敗（GitHub " + cur.status + "）");
+      const cats = Object.assign({}, prev ? prev.cats : {});
+      for (const name of A.dirty) { const p = D.projects.find(x => x.name === name); if (p) cats[name] = p.cats.slice(); }
+      const e = {schema: 1, at: nowLocal(), by: A.login, categories: D.categories.map(c => ({id: c.id, name: c.name, color: c.color})),
+                 deleted: [...new Set([...(prev ? prev.deleted || [] : []), ...A.deleted])], cats};
+      const body = {message: `線上版整理分類：${A.dirty.size} 個專案`, content: b64(JSON.stringify(e, null, 1)), branch: "main"};
+      if (sha) body.sha = sha;
+      const put = await gh(`/repos/${REPO}/contents/${EDITS}`, {method: "PUT", body: JSON.stringify(body)});
+      if (!put.ok) throw new Error(put.status === 409 ? "剛好有別處同時儲存，請再按一次儲存" : "儲存失敗（GitHub " + put.status + "）");
+      A.edits = e; A.snapshot = JSON.stringify(D); A.dirty.clear(); A.deleted.clear(); A.catsDirty = false;
+      gh(`/repos/${D.owner}/${D.owner}/dispatches`, {method: "POST", body: JSON.stringify({event_type: "refresh"})}).catch(() => {});
+      render(); toast("已儲存。個人首頁總表約 1～2 分鐘後更新；桌面版下次「彙整 GitHub」會套用");
+    } catch (err) { toast(err.message); }
+    btn.lastChild.textContent = "儲存"; adminBar();
+  };
+
   // ------------------------------------------------------------ 載入
-  fetch("../data/projects.json", {cache: "no-cache"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(d => {
-    D = d;
+  Promise.all([
+    fetch("../data/projects.json", {cache: "no-cache"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+    fetch("../data/edits.json", {cache: "no-cache"}).then(r => r.ok ? r.json() : null).catch(() => null)
+  ]).then(([d, e]) => {
+    D = d; A.edits = e; overlay(D, e); A.snapshot = JSON.stringify(D);
     $("who").textContent = `${d.team ? d.team + " · " : ""}github.com/${d.owner} · ${d.projects.length} 個公開專案`;
     $("gen").textContent = "資料時間 " + d.generated.replace("T", " ").slice(0, 16);
     $("q").value = state.q; $("sort").value = state.sort;
     kpis(); render();
     const m = location.hash.match(/^#p=(.+)$/); if (m) open(decodeURIComponent(m[1]));
+    let t = ""; try { t = localStorage.getItem("zp-admin") || ""; } catch (err) {}
+    if (t) login(t, false).catch(err => toast("管理者權杖無法使用：" + err.message));
   }).catch(() => { $("list").innerHTML = `<div class="empty"><span class="ms" style="font-size:48px">cloud_off</span><p>資料載入失敗，請重新整理。</p></div>`; $("who").textContent = ""; });
 })();
 </script>

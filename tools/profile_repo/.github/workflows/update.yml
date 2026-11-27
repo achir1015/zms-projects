@@ -1,0 +1,43 @@
+# 個人首頁總表：從 zms-projects 的線上版資料產生 README.md
+# 何時執行：線上版管理者按「儲存」、桌面版「發佈線上版」之後（repository_dispatch），每天一次，或手動。
+name: 更新個人首頁總表
+on:
+  repository_dispatch:
+    types: [refresh]
+  schedule:
+    - cron: "17 22 * * *"      # 台灣時間每天 06:17
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: profile
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 取得 zms-projects 的資料與產生程式
+        uses: actions/checkout@v4
+        with:
+          repository: achir1015/zms-projects
+          path: src
+          sparse-checkout: |
+            zp/profile.py
+            tools/profile_ci.py
+            docs/data/projects.json
+            docs/data/edits.json
+          sparse-checkout-cone-mode: false
+      - name: 等 GitHub Pages 的圖示更新
+        if: github.event_name == 'repository_dispatch'
+        run: sleep 60
+      - name: 產生 README.md
+        run: python3 src/tools/profile_ci.py src README.md
+      - name: 有變化才 commit
+        run: |
+          if git diff --quiet README.md; then echo "沒有變化"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "更新專案總表"
+          git push

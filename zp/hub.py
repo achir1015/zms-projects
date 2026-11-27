@@ -499,6 +499,11 @@ class HubMixin:
                 and (r["name"] in changed or not known.get(r["name"], {}).get("icon_checked"))]
         if need and not (stop and stop()):
             stat["icons"] = self._fetch_icons(gw, need, say, stop)
+        # 線上版管理者整理的分類（比自動分類優先）
+        stat["online_edits"] = 0
+        if st.get("pages_repo") and self.can("CAT", 2) and not (stop and stop()):
+            say("⑤ 套用線上版的分類整理…")
+            stat["online_edits"] = self.apply_online_edits(gw=gw)
         # 新專案依規則自動分類
         stat["classified"] = self.auto_classify(only_uncategorized=True) if self.can("CAT", 2) else 0
         note = "共 %(total)d 個專案，新增 %(new)d、README %(readme)d、發佈版本 %(release)d" % stat
@@ -506,6 +511,8 @@ class HubMixin:
             note += "（另 %d 個改用發佈頁查詢）" % stat["release_free"]
         if stat["icons"]:
             note += "、圖示 %d" % stat["icons"]
+        if stat["online_edits"]:
+            note += "、線上整理 %d 個專案" % stat["online_edits"]
         if gw.remaining is not None:
             note += "；GitHub 剩餘次數 %s/%s" % (gw.remaining, gw.limit)
             stat["remaining"], stat["limit"] = gw.remaining, gw.limit
@@ -752,7 +759,6 @@ class HubMixin:
                                   % ", ".join(["%s"] * len(names)), tuple(names)):
                 if r["readme"]:
                     readmes[r["name"]] = r["readme"]
-        used = {c["id"] for p in ps for c in p["cats"]}
 
         def iso(v):
             return v.isoformat(timespec="minutes") if isinstance(v, dt.datetime) else (str(v) if v else "")
@@ -779,23 +785,30 @@ class HubMixin:
                 icon=("data:image/png;base64," + p["icon_png"]) if p.get("icon_png") else "", symbol=p["symbol"]))
         data = dict(app="資料助秘專案彙整", schema=1, owner=st.get("github_owner") or "",
                     team=(st.get("name") or ""), generated=dt.datetime.now().isoformat(timespec="seconds"),
-                    categories=[dict(id=c["id"], name=c["name"], color=c["color"]) for c in self.categories()
-                                if c["id"] in used],
+                    categories=[dict(id=c["id"], name=c["name"], color=c["color"]) for c in self.categories()],
                     platforms=[dict(code=c, name=n) for c, n, *_ in PLATFORMS],
                     status_names={str(k): v[0] for k, v in PLT_STATUS.items()}, projects=out)
         return data, readmes
 
     def publish_online(self, repo=""):
-        """把公開資料 commit 到線上版儲存庫的 docs/data/（GitHub Pages 會自動更新，約 1 分鐘）。"""
+        """把公開資料 commit 到線上版儲存庫的 docs/data/（GitHub Pages 會自動更新，約 1 分鐘）。
+        先套用線上版管理者整理的分類（免得蓋掉），並附上專案圖示（個人首頁總表用），最後通知個人首頁更新。"""
         self.need("SYNC", 2)
         st = self.settings_row()
         repo = (repo or st.get("pages_repo") or "").strip()
         if not repo:
             raise BizError("請先在「GitHub 設定」填寫線上版儲存庫（例如 achir1015/zms-projects）")
-        data, readmes = self.public_snapshot()
         gw = Gateway(self.db, self.github_token())
+        if self.can("CAT", 2):
+            self.apply_online_edits(repo, gw=gw)
+        data, readmes = self.public_snapshot()
         files = {"docs/data/projects.json": json.dumps(data, ensure_ascii=False, separators=(",", ":")),
                  "docs/data/readmes.json": json.dumps(readmes, ensure_ascii=False, separators=(",", ":"))}
+        try:
+            from .profile import icon_files
+            files.update({"docs/data/icons/" + k: v for k, v in icon_files(data).items()})
+        except ImportError:                       # 沒有 Pillow（手機）：只更新資料
+            pass
         try:
             sha = gw.commit_files(repo, files, "線上版資料更新：%d 個專案" % len(data["projects"]))
         except RuntimeError as e:
@@ -805,7 +818,58 @@ class HubMixin:
         self.db.exec("UPDATE sys_company SET pages_at=NOW() WHERE id=1")
         self.log("publish", repo, "%d 個專案 %s" % (len(data["projects"]), sha[:7]))
         owner, _, name = repo.partition("/")
-        return dict(count=len(data["projects"]), sha=sha, url="https://%s.github.io/%s/" % (owner.lower(), name))
+        profile = gw.dispatch("%s/%s" % (owner, owner), "refresh")     # 個人首頁總表（沒有這個儲存庫就略過）
+        return dict(count=len(data["projects"]), sha=sha, profile=profile,
+                    url="https://%s.github.io/%s/" % (owner.lower(), name))
+
+    def apply_online_edits(self, repo="", gw=None):
+        """讀線上版的 docs/data/edits.json（管理者在網頁上整理的分類），比上次套用的新就寫進資料庫。
+        回傳套用的專案數；沒有新的整理回傳 0。"""
+        self.need("CAT", 2)
+        st = self.settings_row()
+        repo = (repo or st.get("pages_repo") or "").strip()
+        if not repo:
+            return 0
+        gw = gw or Gateway(self.db, self.github_token())
+        edits = gw.raw_json(repo, "docs/data/edits.json")
+        if not isinstance(edits, dict) or not edits.get("at") or edits["at"] <= (st.get("pages_edits_at") or ""):
+            return 0
+        deleted = {c for c in edits.get("deleted") or [] if isinstance(c, int)}
+        idmap = {}
+        n = 0
+        with self.db.transaction():
+            existing = {c["id"] for c in self.db.rows("SELECT id FROM prj_category")}
+            for cid in deleted & existing:
+                self.db.exec("DELETE FROM prj_assign WHERE cat_id=%s", (cid,))
+                self.db.exec("DELETE FROM prj_category WHERE id=%s", (cid,))
+            for sort, c in enumerate(edits.get("categories") or [], 1):
+                name = (c.get("name") or "").strip()[:40]
+                color = c.get("color") if re.fullmatch(r"#[0-9A-Fa-f]{6}", c.get("color") or "") else PALETTE[sort % len(PALETTE)]
+                cid = c.get("id")
+                if not name:
+                    continue
+                same = self.db.value("SELECT id FROM prj_category WHERE name=%s", (name,))
+                if isinstance(cid, int) and cid in existing and cid not in deleted and (not same or same == cid):
+                    self.db.exec("UPDATE prj_category SET name=%s, color=%s, sort=%s WHERE id=%s",
+                                 (name, color.upper(), sort, cid))
+                    idmap[cid] = cid
+                elif same:
+                    self.db.exec("UPDATE prj_category SET color=%s, sort=%s WHERE id=%s", (color.upper(), sort, same))
+                    idmap[cid] = same
+                else:
+                    idmap[cid] = self.db.exec("INSERT INTO prj_category (name, color, sort) VALUES (%s, %s, %s)",
+                                              (name, color.upper(), sort))
+            names = {r["name"] for r in self.db.rows("SELECT name FROM prj_project")}
+            for name, ids in (edits.get("cats") or {}).items():
+                if name not in names or not isinstance(ids, list):
+                    continue
+                self.db.exec("DELETE FROM prj_assign WHERE name=%s", (name,))
+                for cid in dict.fromkeys(idmap[i] for i in ids if i in idmap):
+                    self.db.exec("INSERT IGNORE INTO prj_assign (name, cat_id) VALUES (%s, %s)", (name, cid))
+                n += 1
+            self.db.exec("UPDATE sys_company SET pages_edits_at=%s WHERE id=1", (edits["at"][:19],))
+        self.log("online_edits", repo, "%d 個專案（%s %s）" % (n, edits.get("by") or "", edits["at"]))
+        return n
 
     # ================================================================ 首頁與統計
     def dashboard(self):

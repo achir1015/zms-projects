@@ -2,6 +2,7 @@
 
   docs/lessons.json、docs/voice/*.mp3、docs/icon.png  ← 語音動態教學（與程式內相同）
   docs/data/projects.json、docs/data/readmes.json     ← 線上專案總覽的資料（只含公開專案，加 --data 才產生）
+  docs/data/icons/*.png                              ← 個人首頁總表用的專案圖示（加 --data 才產生）
 
 用法：
   python tools/make_pages.py                 只更新教學與圖示
@@ -80,6 +81,11 @@ def data(installed=False):
         json.dump(snap, f, ensure_ascii=False, separators=(",", ":"))
     with open(os.path.join(d, "readmes.json"), "w", encoding="utf-8") as f:
         json.dump(readmes, f, ensure_ascii=False, separators=(",", ":"))
+    from zp.profile import icon_files                # 個人首頁總表用的專案圖示（docs/data/icons/）
+    os.makedirs(os.path.join(d, "icons"), exist_ok=True)
+    for name, png in icon_files(snap).items():
+        with open(os.path.join(d, "icons", name), "wb") as f:
+            f.write(png)
     print("projects:", len(snap["projects"]), "readmes:", len(readmes),
           "size: %d KB / %d KB" % (os.path.getsize(os.path.join(d, "projects.json")) // 1024,
                                    os.path.getsize(os.path.join(d, "readmes.json")) // 1024))

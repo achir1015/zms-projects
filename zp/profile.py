@@ -4,7 +4,10 @@ GitHub 個人首頁只能顯示 Markdown（不能跑程式），所以這裡把�
 轉成一份靜態總表：依分類列出每個專案的小圖示、主題、說明、已發佈平台與下載／線上版連結，
 並附上專案彙整線上版的連結，要搜尋、看明細就點過去。
 
-build(snap) → (README 文字, {檔案路徑: bytes})；圖示另存成 icons/<專案>.png（README 不能內嵌 data: 圖片）。
+build(snap, icon_base) → README 文字；圖示用 icon_files(snap) 另存成 PNG（README 不能內嵌 data: 圖片），
+正式版放在 GitHub Pages 的 docs/data/icons/，個人首頁用絕對網址引用。
+apply_edits(snap, edits) 把線上版管理者整理的分類（docs/data/edits.json）套到資料上。
+這個檔案只用標準函式庫（畫圖示時才用 Pillow），個人首頁儲存庫的 GitHub Actions 也直接下載它來產生 README。
 """
 import base64
 import io
@@ -14,13 +17,12 @@ from urllib.parse import quote
 
 ONLINE = "https://achir1015.github.io/zms-projects/app/"
 SITE = "https://achir1015.github.io/zms-projects/"
+ICON_BASE = SITE + "data/icons/"
 
-# 專案只放在一個分類：越專門的分類越優先（「小柯機器人」最廣，放最後）
-CAT_PRIORITY = ["眼動鼠", "遊戲", "ESP32-S3", "3D列印", "長照", "資料助秘", "小柯機器人"]
-CAT_EMOJI = {"資料助秘": "🗂️", "小柯機器人": "🤖", "遊戲": "🎮", "眼動鼠": "👁️", "ESP32-S3": "🔌",
+# 每個專案在總表只出現一次：放在它所屬分類中「專案最少（最專門）」的那個；段落順序＝分類順序
+CAT_EMOJI = {"未分類": "📦", "資料助秘": "🗂️", "小柯機器人": "🤖", "遊戲": "🎮", "眼動鼠": "👁️", "ESP32-S3": "🔌",
              "3D列印": "🖨️", "長照": "🩺"}
-CAT_ORDER = ["資料助秘", "小柯機器人", "遊戲", "眼動鼠", "ESP32-S3", "3D列印", "長照"]
-OTHER = "其他"
+OTHER = "未分類"         # 沒有分類的專案（和線上版的「未分類」頁簽同名）
 
 PLATFORMS = [("WIN", "Windows"), ("MAC", "Mac"), ("WEB", "線上版"), ("IOS", "iPhone"), ("IPAD", "iPad"),
              ("AND", "Android")]
@@ -48,12 +50,27 @@ def _esc(text):
     return (text or "").replace("|", "｜").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _primary_cat(p, cats):
-    names = [cats[c] for c in p.get("cats") or [] if c in cats]
-    for c in CAT_PRIORITY:
-        if c in names:
-            return c
-    return names[0] if names else OTHER
+def _primary_cat(p, cats, sizes):
+    ids = [c for c in p.get("cats") or [] if c in cats]
+    if not ids:
+        return None
+    return min(ids, key=lambda c: (sizes.get(c, 0), list(cats).index(c)))
+
+
+def apply_edits(snap, edits):
+    """線上版管理者的分類整理（edits.json）比這份資料新時，套用上去。回傳 True＝有套用。"""
+    if not edits or not edits.get("at") or edits.get("at", "") <= (snap.get("generated") or ""):
+        return False
+    snap["categories"] = [dict(id=c["id"], name=c["name"], color=c.get("color") or "#2563EB")
+                          for c in edits.get("categories") or []]
+    valid = {c["id"] for c in snap["categories"]}
+    cats = edits.get("cats") or {}
+    for p in snap.get("projects") or []:
+        if p["name"] in cats:
+            p["cats"] = [c for c in cats[p["name"]] if c in valid]
+        else:
+            p["cats"] = [c for c in p.get("cats") or [] if c in valid]
+    return True
 
 
 def _released(p):
@@ -127,23 +144,42 @@ def _button(text, color, scale=2):
     return buf.getvalue(), w // scale, h // scale
 
 
-def _badge(files, key, text, color, link):
-    png, w, h = _button(text, color)
-    files["icons/_%s.png" % key] = png
-    return '<a href="%s"><img src="icons/_%s.png" width="%d" height="%d" alt="%s"></a>' % (link, key, w, h, text)
+BUTTONS = {"online": ("開啟線上專案總覽", "#2563EB"), "download": ("下載專案彙整 App", "#DC2626")}
+BUTTON_SIZE = {"online": (172, 40), "download": (176, 40)}     # 顯示大小（icon_files 畫出來的圖會一致）
 
 
-def build(snap, today=None):
+def _badge(icon_base, key, link):
+    text = BUTTONS[key][0]
+    w, h = BUTTON_SIZE[key]
+    return '<a href="%s"><img src="%s_%s.png" width="%d" height="%d" alt="%s"></a>' % (link, icon_base, key, w, h, text)
+
+
+def icon_files(snap):
+    """{檔名: PNG bytes}：每個專案的圖示＋兩個按鈕（需要 Pillow）。"""
+    files = {}
+    for p in snap.get("projects") or []:
+        files["%s.png" % p["name"]] = _icon_file(p)
+    for key, (text, color) in BUTTONS.items():
+        png, w, h = _button(text, color)
+        BUTTON_SIZE[key] = (w, h)
+        files["_%s.png" % key] = png
+    return files
+
+
+def build(snap, icon_base=ICON_BASE, today=None):
     owner = snap.get("owner") or "achir1015"
     cats = {c["id"]: c["name"] for c in snap.get("categories") or []}
     ps = [p for p in snap.get("projects") or [] if not p.get("fork") and not p.get("archived")]
-    files = {}
+    sizes = {}
+    for p in ps:
+        for c in p.get("cats") or []:
+            sizes[c] = sizes.get(c, 0) + 1
     groups = {}
     for p in ps:
-        groups.setdefault(_primary_cat(p, cats), []).append(p)
-        files["icons/%s.png" % p["name"]] = _icon_file(p)
-    order = [c for c in CAT_ORDER if c in groups] + sorted(c for c in groups if c not in CAT_ORDER and c != OTHER)
-    if OTHER in groups:
+        cid = _primary_cat(p, cats, sizes)
+        groups.setdefault(cats[cid] if cid else OTHER, []).append(p)
+    order = [n for n in cats.values() if n in groups]
+    if OTHER in groups and OTHER not in order:
         order.append(OTHER)
 
     released = sum(1 for p in ps if _released(p))
@@ -160,9 +196,8 @@ def build(snap, today=None):
     L.append("**%d** 個公開專案 ・ **%d** 個已發佈 ・ **%d** 個可直接線上使用" % (len(ps), released, online))
     L.append("")
     L.append(" ".join([
-        _badge(files, "online", "開啟線上專案總覽", "#2563EB", ONLINE),
-        _badge(files, "download", "下載專案彙整 App", "#DC2626",
-               "https://github.com/%s/zms-projects/releases/latest" % owner),
+        _badge(icon_base, "online", ONLINE),
+        _badge(icon_base, "download", "https://github.com/%s/zms-projects/releases/latest" % owner),
     ]))
     L.append("")
     L.append("</div>")
@@ -172,7 +207,7 @@ def build(snap, today=None):
     # 分類目錄
     toc = []
     for c in order:
-        toc.append("[%s %s（%d）](#%s)" % (CAT_EMOJI.get(c, "📦"), c, len(groups[c]), _anchor(c)))
+        toc.append("[%s %s（%d）](#%s)" % (CAT_EMOJI.get(c, "📁"), c, len(groups[c]), _anchor(c)))
     L.append("**分類：** " + " ・ ".join(toc))
     L.append("")
 
@@ -180,7 +215,7 @@ def build(snap, today=None):
         items = sorted(groups[c], key=lambda p: (not _released(p), -_ts(p.get("pushed"))))
         L.append('<a id="%s"></a>' % _anchor(c))
         L.append("")
-        L.append("## %s %s（%d）" % (CAT_EMOJI.get(c, "📦"), c, len(items)))
+        L.append("## %s %s（%d）" % (CAT_EMOJI.get(c, "📁"), c, len(items)))
         L.append("")
         if c == OTHER:
             L.append("<details><summary>展開 %d 個專案</summary>" % len(items))
@@ -192,7 +227,7 @@ def build(snap, today=None):
             desc = _short(p.get("description"))
             if desc and desc.startswith(title):
                 desc = desc[len(title):].lstrip("：: ")
-            icon = '<img src="icons/%s.png" width="44" height="44" align="left" alt="">' % quote(p["name"])
+            icon = '<img src="%s%s.png" width="44" height="44" align="left" alt="">' % (icon_base, quote(p["name"]))
             cell = icon + "**[%s](%s)**" % (_esc(title), p["url"])
             if desc:
                 cell += "<br><sub>%s</sub>" % _esc(desc)
@@ -207,7 +242,7 @@ def build(snap, today=None):
     L.append('<sub>這份總表由 <a href="https://github.com/%s/zms-projects">資料助秘專案彙整</a> 自動產生（%s 更新）。'
              '系統開發：吳玉柱 先生 與 Claude AI Opus 5.5</sub>' % (owner, today))
     L.append("")
-    return "\n".join(L), files
+    return "\n".join(L)
 
 
 def _anchor(cat):

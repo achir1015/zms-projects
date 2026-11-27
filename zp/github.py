@@ -5,6 +5,7 @@
 * README 走 raw.githubusercontent.com（不扣次數）。
 * 次數用完時，最新發佈版本改從 github.com 發佈頁的轉址＋下載清單頁取得（不扣次數）。
 """
+import base64
 import json
 import re
 import ssl
@@ -225,20 +226,59 @@ class Gateway:
             raise RuntimeError("GitHub 回應 %s：%s" % (e.code, msg))
 
     def commit_files(self, repo, files, message, branch=""):
-        """把多個文字檔一次 commit 到儲存庫（Git Data API，共 5 次呼叫）。files：{路徑: 文字內容}。"""
+        """把多個檔案一次 commit 到儲存庫（Git Data API）。files：{路徑: 文字內容 或 bytes}。
+        bytes（圖片）先比對儲存庫裡現有的檔案，內容一樣的不重傳。"""
         if not branch:
             branch = (self._send("GET", "/repos/%s" % repo) or {}).get("default_branch") or "main"
         ref = self._send("GET", "/repos/%s/git/ref/heads/%s" % (repo, branch))
         head = ref["object"]["sha"]
         base = self._send("GET", "/repos/%s/git/commits/%s" % (repo, head))["tree"]["sha"]
-        tree = self._send("POST", "/repos/%s/git/trees" % repo, {"base_tree": base, "tree": [
-            {"path": k, "mode": "100644", "type": "blob", "content": v} for k, v in files.items()]})
+        entries = []
+        binary = {k: v for k, v in files.items() if isinstance(v, bytes)}
+        if binary:
+            have = {t["path"]: t["sha"] for t in
+                    (self._send("GET", "/repos/%s/git/trees/%s?recursive=1" % (repo, base)) or {}).get("tree") or []}
+            for k, v in binary.items():
+                sha = git_blob_sha(v)
+                if have.get(k) == sha:
+                    continue
+                blob = self._send("POST", "/repos/%s/git/blobs" % repo,
+                                  {"content": base64.b64encode(v).decode("ascii"), "encoding": "base64"})
+                entries.append({"path": k, "mode": "100644", "type": "blob", "sha": blob["sha"]})
+        entries += [{"path": k, "mode": "100644", "type": "blob", "content": v}
+                    for k, v in files.items() if not isinstance(v, bytes)]
+        if not entries:
+            return head
+        tree = self._send("POST", "/repos/%s/git/trees" % repo, {"base_tree": base, "tree": entries})
         if tree["sha"] == base:
             return head                          # 內容沒變
         c = self._send("POST", "/repos/%s/git/commits" % repo, {"message": message, "tree": tree["sha"],
                                                                 "parents": [head]})
         self._send("PATCH", "/repos/%s/git/refs/heads/%s" % (repo, branch), {"sha": c["sha"]})
         return c["sha"]
+
+    def raw_json(self, repo, path, branch="main"):
+        """讀儲存庫的 JSON 檔；不存在或讀不到回傳 None。
+        有 Token 時走 API（拿到的一定是最新內容；raw 網址有約 5 分鐘快取），沒有時走 raw（不扣次數）。"""
+        data = self._raw_file(repo, branch, path, private=bool(self.token))
+        try:
+            return json.loads(data.decode("utf-8")) if data else None
+        except ValueError:
+            return None
+
+    def dispatch(self, repo, event):
+        """觸發儲存庫的 GitHub Actions（repository_dispatch）；沒權限或失敗回傳 False。"""
+        try:
+            self._send("POST", "/repos/%s/dispatches" % repo, {"event_type": event})
+            return True
+        except Exception:
+            return False
+
+
+def git_blob_sha(data):
+    """和 git 一樣算檔案的 sha1（用來判斷儲存庫裡的檔案是否已經一樣）。"""
+    import hashlib
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
 
 
 # ================================================================ 專案圖示
